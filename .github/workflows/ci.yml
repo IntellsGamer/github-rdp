@@ -92,17 +92,18 @@ jobs:
     steps:
     - name: Install Applications (Chrome, 7-Zip, Notepad++, Everything, WinRAR, VS Code, AnyDesk, FFmpeg, VLC)
       if: inputs.install_chrome || inputs.install_7zip || inputs.install_notepadpp || inputs.install_everything || inputs.install_winrar || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+      shell: pwsh
       run: |
         $apps = @()
-        if (${{ inputs.install_chrome }}) { $apps += "googlechrome" }
-        if (${{ inputs.install_7zip }}) { $apps += "7zip" }
-        if (${{ inputs.install_notepadpp }}) { $apps += "notepadplusplus" }
-        if (${{ inputs.install_everything }}) { $apps += "everything" }
-        if (${{ inputs.install_winrar }}) { $apps += "winrar" }
-        if (${{ inputs.install_vscode }}) { $apps += "vscode" }
-        if (${{ inputs.install_anydesk }}) { $apps += "anydesk" }
-        if (${{ inputs.install_ffmpeg }}) { $apps += "ffmpeg" }
-        if (${{ inputs.install_vlc }}) { $apps += "vlc" }
+        if ('${{ inputs.install_chrome }}' -eq 'true') { $apps += "googlechrome" }
+        if ('${{ inputs.install_7zip }}' -eq 'true') { $apps += "7zip" }
+        if ('${{ inputs.install_notepadpp }}' -eq 'true') { $apps += "notepadplusplus" }
+        if ('${{ inputs.install_everything }}' -eq 'true') { $apps += "everything" }
+        if ('${{ inputs.install_winrar }}' -eq 'true') { $apps += "winrar" }
+        if ('${{ inputs.install_vscode }}' -eq 'true') { $apps += "vscode" }
+        if ('${{ inputs.install_anydesk }}' -eq 'true') { $apps += "anydesk" }
+        if ('${{ inputs.install_ffmpeg }}' -eq 'true') { $apps += "ffmpeg" }
+        if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
         
         if ($apps.Count -gt 0) {
           $appList = $apps -join " "
@@ -110,7 +111,7 @@ jobs:
           Start-Sleep -Seconds 5
           
           # Pin Chrome to taskbar if installed
-          if (${{ inputs.install_chrome }}) {
+          if ('${{ inputs.install_chrome }}' -eq 'true') {
             $shell = New-Object -ComObject Shell.Application
             $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
             if (Test-Path $path) {
@@ -119,7 +120,7 @@ jobs:
           }
           
           # Pin VS Code to taskbar if installed
-          if (${{ inputs.install_vscode }}) {
+          if ('${{ inputs.install_vscode }}' -eq 'true') {
             $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
             if (Test-Path $vscodePath) {
               $shell = New-Object -ComObject Shell.Application
@@ -580,6 +581,6 @@ jobs:
       if: always()
       shell: pwsh
       run: |
-        Write-Host "Logging out of Tailscale..."
+        Write-Host "🔄 Logging out of Tailscale..."
         & "C:\Program Files\Tailscale\tailscale.exe" logout
-        Write-Host "Logged out successfully"
+        Write-Host "✅ Tailscale logged out"
