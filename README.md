@@ -40,7 +40,7 @@ Fork this repository, configure repository secrets (mentioned below), and run `C
 
 - GitHub repository with Actions enabled
 - Two GitHub Secrets configured (see below)
-- A legitimate need to access a Windows runner (don't be *that* guy)
+- A legitimate need to access a Windows / Linux runner (don't be *that* guy)
 
 ---
 
@@ -53,16 +53,16 @@ Go to your repository → Settings → Secrets and variables → Actions → Add
 | Secret Name | Description |
 |-------------|-------------|
 | `TAILSCALE_AUTH_KEY` | Your Tailscale auth key (get from Tailscale admin console) |
-| `RDP_PASSWORD` | Password for the Windows user (8+ characters, make it something good) |
+| `RDP_PASSWORD` | Password for the Windows / Linux user (8+ characters, make it something good) |
 
 Uh, your RDP password doesn't matter at all lol because GitHub Actions **do not have internet-routable IP addresses**, yeah just put something good for it.
 
 ### 2. Run the Workflow
 
 1. Go to Actions tab
-2. Select "CI-RDP" workflow
+2. Select "CI-RDP-Windows" or "CI-RDP-Linux" workflow
 3. Click "Run workflow"
-4. Wait ~5-10 minutes for setup (go grab a coffee or some shi)
+4. Wait **~4 minutes** for setup (go grab a coffee or some shi)
 5. Check workflow logs for connection details
 
 ### 3. Connect
@@ -70,14 +70,14 @@ Uh, your RDP password doesn't matter at all lol because GitHub Actions **do not 
 The workflow logs will display something like:
 ```
 ✅ RDP Ready - 100.64.0.1:3389 (THE REAL IP IS DIFFERENT)
-Username: runneradmin
+Username: runneradmin (or runner if Linux)
 Password is set in Repository Secrets (hope you haven't forgotten it bro)
 Connect via SSH: ssh runneradmin@100.64.0.1
 ```
 
 Connect via:
 - **RDP**: Use Windows Remote Desktop Client to `100.64.0.1:3389`
-- **SSH**: `ssh runneradmin@100.64.0.1` (password from `RDP_PASSWORD`)
+- **SSH**: `ssh runneradmin@100.64.0.1` (or runner if Linux) [password from `RDP_PASSWORD`]
 - **Tailscale**: The machine will appear in your Tailscale network
 
 > The real IP you use to connect is **dynamic** and is **not 100.64.0.1**
