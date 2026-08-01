@@ -616,7 +616,6 @@ jobs:
                             Write-Host "🛑 Self-destruct signal detected!"
                             Write-Host "Removing stop file..."
                             Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
-                            Write-Host "=========================================="
                             break
                         }
 
@@ -639,6 +638,6 @@ jobs:
               if: always()
               shell: pwsh
               run: |
-                    Write-Host "🔄 Logging out of Tailscale..."
+                    Write-Host "Logging out of Tailscale..."
                     & "C:\Program Files\Tailscale\tailscale.exe" logout
-                    Write-Host "✅ Tailscale logged out"
+                    Write-Host "Cleanup completed successfully."
