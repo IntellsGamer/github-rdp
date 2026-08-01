@@ -113,7 +113,7 @@ Connect via:
 
 ---
 
-## Known Probolems
+## Known Problems
 
 | Issue | Status |
 |-------|--------|
