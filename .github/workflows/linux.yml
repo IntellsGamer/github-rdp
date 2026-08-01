@@ -201,6 +201,54 @@ jobs:
                         '    </property>' \
                         '</channel>' > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
 
+            - name: Configure Solid Black Background for XRDP
+              run: |
+                    # Set solid black background for XFCE
+                    mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
+                    
+                    # Configure desktop background to solid black
+                    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+                        '<channel name="xfce4-desktop" version="1.0">' \
+                        '    <property name="backdrop" type="empty">' \
+                        '        <property name="screen0" type="empty">' \
+                        '            <property name="monitor0" type="empty">' \
+                        '                <property name="image-path" type="string" value=""/>' \
+                        '                <property name="image-style" type="int" value="0"/>' \
+                        '                <property name="image-show" type="bool" value="false"/>' \
+                        '                <property name="color-style" type="int" value="0"/>' \
+                        '                <property name="color1" type="string" value="rgb(0,0,0)"/>' \
+                        '                <property name="color2" type="string" value="rgb(0,0,0)"/>' \
+                        '            </property>' \
+                        '        </property>' \
+                        '    </property>' \
+                        '    <property name="last" type="empty">' \
+                        '        <property name="image" type="string" value=""/>' \
+                        '    </property>' \
+                        '</channel>' > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml
+                    
+                    # Also set black background using xfconf-query if available
+                    if command -v xfconf-query &> /dev/null; then
+                        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-path -s "" 2>/dev/null || true
+                        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-show -s "false" 2>/dev/null || true
+                        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color-style -s "0" 2>/dev/null || true
+                        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color1 -s "rgb(0,0,0)" 2>/dev/null || true
+                        xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/color2 -s "rgb(0,0,0)" 2>/dev/null || true
+                    fi
+                    
+                    # Create a simple solid black XPM file as a fallback
+                    mkdir -p ~/.local/share/xfce4/backdrops/
+                    cat > ~/.local/share/xfce4/backdrops/black.xpm << 'EOF'
+                    /* XPM */
+                    static char *black_xpm[] = {
+                    "1 1 2 1",
+                    "   c None",
+                    ".  c #000000",
+                    "."
+                    };
+                    EOF
+                    
+                    echo "✅ Solid black background configured"
+
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
               run: |
