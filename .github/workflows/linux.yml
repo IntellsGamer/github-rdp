@@ -77,7 +77,14 @@ jobs:
                         xorg xfce4 xfce4-goodies \
                         xrdp tightvncserver \
                         dbus-x11 \
-                        htop neofetch
+                        htop neofetch \
+                        unzip
+
+            - name: Create Desktop Directory
+              run: |
+                    mkdir -p ~/Desktop
+                    mkdir -p ~/.local/share/applications
+                    echo "✅ Desktop directories created"
 
             - name: Install Applications (Chrome, VS Code, AnyDesk, FFmpeg, VLC)
               if: inputs.install_chrome || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
@@ -126,12 +133,19 @@ jobs:
             - name: Install OpenCode AI
               if: inputs.install_opencode
               run: |
+                    # Install npm if not present
+                    if ! command -v npm &> /dev/null; then
+                        sudo apt-get install -y npm
+                    fi
                     sudo npm i -g opencode-ai
                     echo "✅ OpenCode installed"
 
             - name: Install Kilo CLI
               if: inputs.install_kilocli
               run: |
+                    if ! command -v npm &> /dev/null; then
+                        sudo apt-get install -y npm
+                    fi
                     sudo npm install -g @kilocode/cli
                     echo "✅ Kilo CLI installed"
 
@@ -148,7 +162,8 @@ jobs:
                         
                         # Extract and install
                         mkdir -p /tmp/ghostery_extract
-                        unzip /tmp/ghostery.crx -d /tmp/ghostery_extract -qq
+                        unzip -q /tmp/ghostery.crx -d /tmp/ghostery_extract
+                        mkdir -p "$CHROME_EXTENSION_DIR/mlomiejdfkolichcflejclcbmpeaniij"
                         cp -r /tmp/ghostery_extract/* "$CHROME_EXTENSION_DIR/mlomiejdfkolichcflejclcbmpeaniij/"
                         
                         # Cleanup
@@ -193,17 +208,15 @@ jobs:
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
               run: |
-                    # Disable screensaver
-                    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
-                    gsettings set org.gnome.desktop.screensaver lock-enabled false
+                    # Install x11-utils for xset
+                    sudo apt-get install -y x11-utils
                     
-                    # Disable screen blanking (XFCE)
-                    xset s off
-                    xset s noblank
-                    xset -dpms
+                    # Disable screensaver
+                    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || echo "Screensaver settings skipped"
+                    gsettings set org.gnome.desktop.screensaver lock-enabled false 2>/dev/null || echo "Lock settings skipped"
                     
                     # Disable automatic suspend
-                    sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+                    sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 2>/dev/null || echo "Suspend masking skipped"
                     
                     echo "✅ Power and sleep settings configured"
 
@@ -214,17 +227,17 @@ jobs:
                     sudo sed -i 's/ENABLED=1/ENABLED=0/g' /etc/default/ubuntu-report 2>/dev/null || echo "Ubuntu report not found"
                     
                     # Disable apt telemetry
-                    sudo apt-get remove -y ubuntu-web-launchers popularity-contest || echo "Packages not found"
+                    sudo apt-get remove -y ubuntu-web-launchers popularity-contest 2>/dev/null || echo "Packages not found"
                     
                     # Stop unnecessary services
-                    sudo systemctl stop cups || echo "CUPS not running"
-                    sudo systemctl disable cups || echo "CUPS already disabled"
-                    sudo systemctl stop bluetooth || echo "Bluetooth not running"
-                    sudo systemctl disable bluetooth || echo "Bluetooth already disabled"
+                    sudo systemctl stop cups 2>/dev/null || echo "CUPS not running"
+                    sudo systemctl disable cups 2>/dev/null || echo "CUPS already disabled"
+                    sudo systemctl stop bluetooth 2>/dev/null || echo "Bluetooth not running"
+                    sudo systemctl disable bluetooth 2>/dev/null || echo "Bluetooth already disabled"
                     
                     # Disable automatic updates
-                    sudo systemctl stop unattended-upgrades || echo "Unattended upgrades not running"
-                    sudo systemctl disable unattended-upgrades || echo "Unattended upgrades already disabled"
+                    sudo systemctl stop unattended-upgrades 2>/dev/null || echo "Unattended upgrades not running"
+                    sudo systemctl disable unattended-upgrades 2>/dev/null || echo "Unattended upgrades already disabled"
                     
                     echo "✅ Telemetry and unnecessary services disabled"
 
@@ -247,15 +260,15 @@ jobs:
                     # Configure XRDP to use XFCE
                     echo "startxfce4" > ~/.xsession
                     
-                    # Configure XRDP
-                    sudo sed -i 's/port=3389/port=3389/g' /etc/xrdp/xrdp.ini
-                    
                     # Add user to SSL group
-                    sudo adduser $USER ssl-cert
+                    sudo adduser runner ssl-cert 2>/dev/null || echo "User already in group"
+                    
+                    # Configure XRDP to use the correct session
+                    sudo sed -i 's/^exec.*/exec startxfce4/' /etc/xrdp/xrdp.ini 2>/dev/null || echo "xrdp.ini not found"
                     
                     # Restart XRDP
-                    sudo systemctl enable xrdp
-                    sudo systemctl restart xrdp
+                    sudo systemctl enable xrdp 2>/dev/null || echo "xrdp enable skipped"
+                    sudo systemctl restart xrdp 2>/dev/null || echo "xrdp restart skipped"
                     
                     echo "✅ XRDP configured"
 
@@ -288,6 +301,9 @@ jobs:
 
             - name: Create Self-Destruct Script
               run: |
+                    # Ensure Desktop directory exists
+                    mkdir -p ~/Desktop
+                    
                     cat > ~/Desktop/Stop-VM.sh << 'EOF'
                     #!/bin/bash
                     echo "Creating stop signal and logging out of Tailscale..."
@@ -334,10 +350,14 @@ jobs:
                         Categories=Development;IDE;
                         EOF
                     fi
+                    
+                    echo "✅ Desktop launchers created"
 
             - name: Session Activity Logger
               run: |
-                    echo "[$(date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" >> ~/session_activity.log
+                    mkdir -p ~/Documents
+                    echo "[$(date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" >> ~/Documents/session_activity.log
+                    echo "Description: ${{ inputs.use_case_description }}" >> ~/Documents/session_activity.log
 
             - name: Monitor Services and Keep Alive with Self-Destruct
               env:
@@ -405,5 +425,5 @@ jobs:
               if: always()
               run: |
                     echo "Logging out of Tailscale..."
-                    sudo tailscale logout || echo "Tailscale logout failed or already logged out"
+                    sudo tailscale logout 2>/dev/null || echo "Tailscale logout failed or already logged out"
                     echo "Cleanup completed successfully."
