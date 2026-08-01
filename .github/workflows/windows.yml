@@ -1,4 +1,4 @@
-name: CI-RDP
+name: CI-RDP-Windows
 
 on:
     workflow_dispatch:
