@@ -1,0 +1,409 @@
+name: CI-RDP-Linux
+
+on:
+    workflow_dispatch:
+        inputs:
+            install_chrome:
+                description: "Install Google Chrome"
+                type: boolean
+                default: true
+            install_vscode:
+                description: "Install VS Code"
+                type: boolean
+                default: true
+            install_anydesk:
+                description: "Install AnyDesk"
+                type: boolean
+                default: true
+            install_ffmpeg:
+                description: "Install FFmpeg"
+                type: boolean
+                default: true
+            install_vlc:
+                description: "Install VLC Player"
+                type: boolean
+                default: true
+            install_opencode:
+                description: "Install OpenCode AI Agent"
+                type: boolean
+                default: true
+            install_kilocli:
+                description: "Install Kilo CLI"
+                type: boolean
+                default: true
+            install_ghostery:
+                description: "Install Ghostery Extension for Chrome"
+                type: boolean
+                default: false
+            configure_power:
+                description: "Configure Power and Sleep Settings"
+                type: boolean
+                default: true
+            disable_telemetry:
+                description: "Disable Telemetry and Services"
+                type: boolean
+                default: true
+            legitimate_use_case:
+                description: "Select your legitimate use case"
+                type: choice
+                options:
+                    - "Debugging Linux-specific build failure"
+                    - "Testing GUI application in GitHub runner environment"
+                    - "Validating complex build scripts interactively"
+                    - "Investigating CI/CD pipeline error"
+                    - "Other legitimate development purpose"
+                default: "Other legitimate development purpose"
+                required: false
+            use_case_description:
+                description: "Briefly describe your debugging scenario (max 200 chars)"
+                type: string
+                default: "testing"
+                required: false
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        timeout-minutes: 9999
+
+        steps:
+            - name: Update System and Install Base Packages
+              run: |
+                    sudo apt-get update
+                    sudo apt-get upgrade -y
+                    sudo apt-get install -y \
+                        wget curl gnupg2 software-properties-common \
+                        apt-transport-https ca-certificates \
+                        net-tools openssh-server \
+                        xorg xfce4 xfce4-goodies \
+                        xrdp tightvncserver \
+                        dbus-x11 \
+                        htop neofetch
+
+            - name: Install Applications (Chrome, VS Code, AnyDesk, FFmpeg, VLC)
+              if: inputs.install_chrome || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+              run: |
+                    # Install Google Chrome
+                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
+                        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+                        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+                        sudo apt-get update
+                        sudo apt-get install -y google-chrome-stable
+                        echo "✅ Google Chrome installed"
+                    fi
+
+                    # Install VS Code
+                    if [ "${{ inputs.install_vscode }}" = "true" ]; then
+                        wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+                        sudo install -o root -g root -m 644 packages.microsoft.gpg /etc/apt/trusted.gpg.d/
+                        sudo sh -c 'echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+                        sudo apt-get update
+                        sudo apt-get install -y code
+                        rm -f packages.microsoft.gpg
+                        echo "✅ VS Code installed"
+                    fi
+
+                    # Install AnyDesk
+                    if [ "${{ inputs.install_anydesk }}" = "true" ]; then
+                        wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | sudo apt-key add -
+                        echo "deb http://deb.anydesk.com/ all main" | sudo tee /etc/apt/sources.list.d/anydesk-stable.list
+                        sudo apt-get update
+                        sudo apt-get install -y anydesk
+                        echo "✅ AnyDesk installed"
+                    fi
+
+                    # Install FFmpeg
+                    if [ "${{ inputs.install_ffmpeg }}" = "true" ]; then
+                        sudo apt-get install -y ffmpeg
+                        echo "✅ FFmpeg installed"
+                    fi
+
+                    # Install VLC
+                    if [ "${{ inputs.install_vlc }}" = "true" ]; then
+                        sudo apt-get install -y vlc
+                        echo "✅ VLC installed"
+                    fi
+
+            - name: Install OpenCode AI
+              if: inputs.install_opencode
+              run: |
+                    sudo npm i -g opencode-ai
+                    echo "✅ OpenCode installed"
+
+            - name: Install Kilo CLI
+              if: inputs.install_kilocli
+              run: |
+                    sudo npm install -g @kilocode/cli
+                    echo "✅ Kilo CLI installed"
+
+            - name: Install Ghostery Extension for Chrome
+              if: inputs.install_ghostery
+              run: |
+                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
+                        # Install Ghostery extension
+                        CHROME_EXTENSION_DIR="$HOME/.config/google-chrome/Default/Extensions"
+                        mkdir -p "$CHROME_EXTENSION_DIR"
+                        
+                        # Download Ghostery CRX
+                        wget -O /tmp/ghostery.crx "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
+                        
+                        # Extract and install
+                        mkdir -p /tmp/ghostery_extract
+                        unzip /tmp/ghostery.crx -d /tmp/ghostery_extract -qq
+                        cp -r /tmp/ghostery_extract/* "$CHROME_EXTENSION_DIR/mlomiejdfkolichcflejclcbmpeaniij/"
+                        
+                        # Cleanup
+                        rm -rf /tmp/ghostery.crx /tmp/ghostery_extract
+                        echo "✅ Ghostery extension installed"
+                    else
+                        echo "ℹ️ Chrome not selected for installation, skipping Ghostery"
+                    fi
+
+            - name: Configure Desktop Environment (XFCE)
+              run: |
+                    # Configure XFCE for optimal performance
+                    mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
+                    
+                    # Disable compositing for better performance
+                    cat > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << 'EOF'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <channel name="xfwm4" version="1.0">
+                        <property name="general" type="empty">
+                            <property name="use_compositing" type="bool" value="false"/>
+                            <property name="theme" type="string" value="Default"/>
+                        </property>
+                    </channel>
+                    EOF
+                    
+                    # Configure panel
+                    cat > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml << 'EOF'
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <channel name="xfce4-panel" version="1.0">
+                        <property name="panels" type="array">
+                            <value type="int" value="1"/>
+                            <property name="panel-1" type="empty">
+                                <property name="position" type="string" value="p=6;x=0;y=0"/>
+                                <property name="length" type="uint" value="100"/>
+                                <property name="position-locked" type="bool" value="true"/>
+                                <property name="size" type="uint" value="30"/>
+                            </property>
+                        </property>
+                    </channel>
+                    EOF
+
+            - name: Configure Power and Sleep Settings
+              if: inputs.configure_power
+              run: |
+                    # Disable screensaver
+                    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false
+                    gsettings set org.gnome.desktop.screensaver lock-enabled false
+                    
+                    # Disable screen blanking (XFCE)
+                    xset s off
+                    xset s noblank
+                    xset -dpms
+                    
+                    # Disable automatic suspend
+                    sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
+                    
+                    echo "✅ Power and sleep settings configured"
+
+            - name: Disable Telemetry and Unnecessary Services
+              if: inputs.disable_telemetry
+              run: |
+                    # Disable Ubuntu telemetry
+                    sudo sed -i 's/ENABLED=1/ENABLED=0/g' /etc/default/ubuntu-report 2>/dev/null || echo "Ubuntu report not found"
+                    
+                    # Disable apt telemetry
+                    sudo apt-get remove -y ubuntu-web-launchers popularity-contest || echo "Packages not found"
+                    
+                    # Stop unnecessary services
+                    sudo systemctl stop cups || echo "CUPS not running"
+                    sudo systemctl disable cups || echo "CUPS already disabled"
+                    sudo systemctl stop bluetooth || echo "Bluetooth not running"
+                    sudo systemctl disable bluetooth || echo "Bluetooth already disabled"
+                    
+                    # Disable automatic updates
+                    sudo systemctl stop unattended-upgrades || echo "Unattended upgrades not running"
+                    sudo systemctl disable unattended-upgrades || echo "Unattended upgrades already disabled"
+                    
+                    echo "✅ Telemetry and unnecessary services disabled"
+
+            - name: Setup SSH Server
+              run: |
+                    sudo systemctl enable ssh
+                    sudo systemctl start ssh
+                    
+                    # Configure SSH for password authentication
+                    sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+                    sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+                    
+                    # Restart SSH service
+                    sudo systemctl restart ssh
+                    
+                    echo "✅ SSH server configured"
+
+            - name: Setup XRDP
+              run: |
+                    # Configure XRDP to use XFCE
+                    echo "startxfce4" > ~/.xsession
+                    
+                    # Configure XRDP
+                    sudo sed -i 's/port=3389/port=3389/g' /etc/xrdp/xrdp.ini
+                    
+                    # Add user to SSL group
+                    sudo adduser $USER ssl-cert
+                    
+                    # Restart XRDP
+                    sudo systemctl enable xrdp
+                    sudo systemctl restart xrdp
+                    
+                    echo "✅ XRDP configured"
+
+            - name: Download and Install Tailscale
+              run: |
+                    curl -fsSL https://tailscale.com/install.sh | sh
+                    echo "✅ Tailscale installed"
+
+            - name: Start Tailscale
+              env:
+                  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+              run: |
+                    if [ -z "$TAILSCALE_AUTH_KEY" ]; then
+                        echo "❌ TAILSCALE_AUTH_KEY environment variable is not set"
+                        exit 1
+                    fi
+                    sudo tailscale up --auth-key $TAILSCALE_AUTH_KEY
+                    echo "✅ Tailscale started"
+
+            - name: Set User Password
+              env:
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+              run: |
+                    if [ -z "$RDP_PASSWORD" ]; then
+                        echo "❌ RDP_PASSWORD environment variable is not set"
+                        exit 1
+                    fi
+                    echo "runner:$RDP_PASSWORD" | sudo chpasswd
+                    echo "✅ Password set for user 'runner'"
+
+            - name: Create Self-Destruct Script
+              run: |
+                    cat > ~/Desktop/Stop-VM.sh << 'EOF'
+                    #!/bin/bash
+                    echo "Creating stop signal and logging out of Tailscale..."
+                    touch ~/stopmachine
+                    sudo tailscale logout
+                    echo "✅ Stop signal created and Tailscale logged out"
+                    echo "Machine will shut down within 3 minutes."
+                    read -p "Press Enter to exit"
+                    EOF
+                    chmod +x ~/Desktop/Stop-VM.sh
+                    echo "✅ Self-destruct script created"
+
+            - name: Create Desktop Launcher for Applications
+              run: |
+                    # Create desktop launcher directory if it doesn't exist
+                    mkdir -p ~/.local/share/applications
+                    
+                    # Chrome launcher
+                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
+                        cat > ~/.local/share/applications/google-chrome.desktop << 'EOF'
+                        [Desktop Entry]
+                        Version=1.0
+                        Name=Google Chrome
+                        Comment=Access the Internet
+                        Exec=google-chrome-stable %U
+                        Icon=google-chrome
+                        Terminal=false
+                        Type=Application
+                        Categories=Network;WebBrowser;
+                        EOF
+                    fi
+                    
+                    # VS Code launcher
+                    if [ "${{ inputs.install_vscode }}" = "true" ]; then
+                        cat > ~/.local/share/applications/code.desktop << 'EOF'
+                        [Desktop Entry]
+                        Version=1.0
+                        Name=VS Code
+                        Comment=Code Editing
+                        Exec=code %F
+                        Icon=code
+                        Terminal=false
+                        Type=Application
+                        Categories=Development;IDE;
+                        EOF
+                    fi
+
+            - name: Session Activity Logger
+              run: |
+                    echo "[$(date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" >> ~/session_activity.log
+
+            - name: Monitor Services and Keep Alive with Self-Destruct
+              env:
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+              run: |
+                    # Fixed session duration: 5 hours 50 minutes = 21000 seconds
+                    SESSION_SECONDS=21000
+                    
+                    # Get Tailscale IP
+                    IP=$(tailscale ip -4 2>/dev/null || echo "Tailscale not connected")
+                    
+                    echo "================================================"
+                    echo " ✅ RDP Ready - $IP:3389"
+                    echo " ✅ SSH Ready - $IP:22"
+                    echo "======================================="
+                    echo " Username: runner"
+                    echo " Password is set in Repository Secrets"
+                    echo " "
+                    echo " Connect via SSH: ssh runner@$IP"
+                    echo " Connect via RDP: $IP:3389"
+                    echo " "
+                    echo "======================================="
+                    echo "  FOR GITHUB HISTORY LOGGING PURPOSES  "
+                    echo " "
+                    echo " Legitimate Use Case: ${{ inputs.legitimate_use_case }}"
+                    echo " Description: ${{ inputs.use_case_description }}"
+                    echo " "
+                    echo "======================================="
+                    echo " This session will run for 5 hrs 50 mins"
+                    echo " Run '~/Desktop/Stop-VM.sh' to stop early"
+                    echo "================================================"
+                    
+                    # Run for 5 hours 50 minutes
+                    END_TIME=$((SECONDS + SESSION_SECONDS))
+                    LAST_LOG_MINUTE=-1
+                    
+                    while [ $SECONDS -lt $END_TIME ]; do
+                        sleep 180  # Check every 3 minutes
+                        
+                        # Check for self-destruct signal
+                        if [ -f ~/stopmachine ]; then
+                            echo "=========================================="
+                            echo "🛑 Self-destruct signal detected!"
+                            echo "Removing stop file..."
+                            rm -f ~/stopmachine
+                            break
+                        fi
+                        
+                        # Log remaining time every 5 minutes
+                        REMAINING=$(( (END_TIME - SECONDS) / 60 ))
+                        CURRENT_MINUTE=$(( (REMAINING / 5) * 5 ))
+                        if [ $CURRENT_MINUTE -ne $LAST_LOG_MINUTE ] && [ $REMAINING -gt 0 ]; then
+                            LAST_LOG_MINUTE=$CURRENT_MINUTE
+                            REMAINING_HOURS=$(( REMAINING / 60 ))
+                            REMAINING_MINS=$(( REMAINING % 60 ))
+                            echo "$REMAINING_HOURS hours $REMAINING_MINS minutes remaining"
+                        fi
+                    done
+                    
+                    echo "=========================================="
+                    echo "Session complete - System is shutting down"
+                    echo "=========================================="
+
+            - name: Logout Tailscale
+              if: always()
+              run: |
+                    echo "Logging out of Tailscale..."
+                    sudo tailscale logout || echo "Tailscale logout failed or already logged out"
+                    echo "Cleanup completed successfully."
