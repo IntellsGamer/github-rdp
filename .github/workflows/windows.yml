@@ -660,10 +660,30 @@ jobs:
                     Write-Host "Session complete - System is shutting down"
                     Write-Host "=========================================="
 
-            - name: Logout Tailscale (Final Cleanup)
+            - name: Logout Tailscale
               if: always()
               shell: pwsh
               run: |
-                    Write-Host "Logging out of Tailscale..."
-                    & "C:\Program Files\Tailscale\tailscale.exe" logout
-                    Write-Host "Cleanup completed successfully."
+                  Write-Host "Logging out of Tailscale..."
+                  
+                  # Try to logout with 10 second timeout
+                  $process = Start-Process -FilePath "C:\Program Files\Tailscale\tailscale.exe" -ArgumentList "logout" -PassThru -WindowStyle Hidden
+                  
+                  # Wait up to 10 seconds for the process to exit
+                  $timeout = 10
+                  $timer = 0
+                  while (-not $process.HasExited -and $timer -lt $timeout) {
+                      Start-Sleep -Seconds 1
+                      $timer++
+                  }
+                  
+                  if ($process.HasExited) {
+                      Write-Host "Tailscale logout completed successfully"
+                  } else {
+                      Write-Host "Tailscale logout timed out after 10 seconds, killing process..."
+                      $process.Kill()
+                      Stop-Process -Name "tailscale" -Force -ErrorAction SilentlyContinue
+                      Stop-Process -Name "tailscaled" -Force -ErrorAction SilentlyContinue
+                  }
+                  
+                  Write-Host "Cleanup completed successfully."
