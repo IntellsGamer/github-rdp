@@ -680,10 +680,7 @@ jobs:
                   if ($process.HasExited) {
                       Write-Host "Tailscale logout completed successfully"
                   } else {
-                      Write-Host "Tailscale logout timed out after 10 seconds, killing process..."
-                      $process.Kill()
-                      Stop-Process -Name "tailscale" -Force -ErrorAction SilentlyContinue
-                      Stop-Process -Name "tailscaled" -Force -ErrorAction SilentlyContinue
+                      Write-Host "Tailscale logout timed out after 10 seconds."
                   }
                   
                   Write-Host "Cleanup completed successfully."
