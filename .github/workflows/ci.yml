@@ -55,6 +55,10 @@ on:
                 description: "Remove Browser Organization Policies"
                 type: boolean
                 default: true
+            set_py_default_3_12:
+                description: "Set default python 'py' launcher to 3.12"
+                type: boolean
+                default: true
             install_ghostery:
                 description: "Install Ghostery Extension for Chrome"
                 type: boolean
@@ -525,7 +529,7 @@ jobs:
                     $batchContent = @"
                     @echo off
                     echo Creating stop signal and logging out of Tailscale...
-                    timeout /t 5 /nobreak >nul
+                    timeout /t 2 /nobreak >nul
 
                     :: Create stop signal file
                     echo. > "C:\Users\runneradmin\Documents\stopmachine"
@@ -547,6 +551,27 @@ jobs:
                     Write-Host "✅ Self-destruct batch script created at: $batchPath"
                     Write-Host "   Run this script to signal the VM to shut down and logout Tailscale"
 
+            - name: Change default py launcher to 3.12
+              if: inputs.set_py_default_3_12
+              shell: pwsh
+              run: |
+                $env:PY_PYTHON = "3.12"
+                [Environment]::SetEnvironmentVariable("PY_PYTHON", "3.12", "User")
+
+                $pyIniPath = "C:\Windows\py.ini"
+                $pyIniContent = @"
+                [defaults]
+                python=3.12
+                "@
+
+                if (-not (Test-Path $pyIniPath)) {
+                    New-Item -ItemType File -Path $pyIniPath -Force | Out-Null
+                }
+                Set-Content -Path $pyIniPath -Value $pyIniContent
+
+                Write-Host "Python `py` launcher default set to 3.12" -ForegroundColor Green
+                Write-Host "Restart any open terminals for changes to take effect."
+            
             - name: Final Restart Explorer (Apply All Changes)
               run: |
                     # Final restart to apply all changes including theme and context menu
