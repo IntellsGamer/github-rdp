@@ -389,9 +389,19 @@ jobs:
                     echo "Session complete - System is shutting down"
                     echo "=========================================="
 
-            - name: Logout Tailscale (Final Cleanup)
+            - name: Logout Tailscale (Final Cleanup with 10s Timeout)
               if: always() && inputs.install_tailscale
               run: |
-                    echo "Logging out of Tailscale..."
-                    sudo tailscale logout || true
-                    echo "Cleanup completed successfully."
+                  echo "Logging out of Tailscale..."
+                  
+                  # Try to logout with 10 second timeout
+                  timeout 10 sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale logout 2>/dev/null || {
+                      echo "Tailscale logout timed out or failed after 10 seconds"
+                      echo "Force killing Tailscale processes..."
+                  }
+                  
+                  # Kill any remaining processes
+                  sudo pkill -f tailscale 2>/dev/null || true
+                  sudo pkill -f tailscaled 2>/dev/null || true
+                  
+                  echo "Cleanup completed successfully."
