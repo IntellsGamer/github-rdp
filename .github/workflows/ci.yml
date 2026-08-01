@@ -96,7 +96,8 @@ on:
             use_case_description:
                 description: "Briefly describe your debugging scenario (max 200 chars)"
                 type: string
-                required: true
+                default: "testing"
+                required: false
 
 jobs:
     build:
