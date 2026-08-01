@@ -1,6 +1,88 @@
 name: CI-RDP
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+    inputs:
+      install_chrome:
+        description: 'Install Google Chrome'
+        type: boolean
+        default: true
+      install_7zip:
+        description: 'Install 7-Zip'
+        type: boolean
+        default: true
+      install_notepadpp:
+        description: 'Install Notepad++'
+        type: boolean
+        default: true
+      install_everything:
+        description: 'Install Everything Search'
+        type: boolean
+        default: true
+      install_winrar:
+        description: 'Install WinRAR'
+        type: boolean
+        default: true
+      install_vscode:
+        description: 'Install VS Code'
+        type: boolean
+        default: true
+      install_anydesk:
+        description: 'Install AnyDesk'
+        type: boolean
+        default: true
+      install_ffmpeg:
+        description: 'Install FFmpeg'
+        type: boolean
+        default: true
+      install_vlc:
+        description: 'Install VLC Player'
+        type: boolean
+        default: true
+      install_sysinternals:
+        description: 'Install Sysinternals Suite'
+        type: boolean
+        default: true
+      remove_browser_policies:
+        description: 'Remove Browser Organization Policies'
+        type: boolean
+        default: true
+      install_ghostery:
+        description: 'Install Ghostery Extension for Chrome'
+        type: boolean
+        default: true
+      install_wsl:
+        description: 'Install WSL'
+        type: boolean
+        default: true
+      configure_power:
+        description: 'Configure Power and Sleep Settings'
+        type: boolean
+        default: true
+      configure_desktop:
+        description: 'Configure Desktop Icons and Settings'
+        type: boolean
+        default: true
+      disable_win11_context:
+        description: 'Disable Windows 11 Context Menu'
+        type: boolean
+        default: true
+      configure_appearance:
+        description: 'Configure Windows Appearance and Performance'
+        type: boolean
+        default: true
+      disable_telemetry:
+        description: 'Disable Telemetry and Services'
+        type: boolean
+        default: true
+      disable_search_index:
+        description: 'Disable Windows Search Indexing'
+        type: boolean
+        default: true
+      disable_onedrive:
+        description: 'Disable OneDrive'
+        type: boolean
+        default: true
 
 jobs:
   build:
@@ -9,29 +91,55 @@ jobs:
 
     steps:
     - name: Install Applications (Chrome, 7-Zip, Notepad++, Everything, WinRAR, VS Code, AnyDesk, FFmpeg, VLC)
+      if: inputs.install_chrome || inputs.install_7zip || inputs.install_notepadpp || inputs.install_everything || inputs.install_winrar || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
       run: |
-        choco install googlechrome 7zip notepadplusplus everything winrar vscode anydesk ffmpeg vlc -y
-        Start-Sleep -Seconds 5
+        $apps = @()
+        if (${{ inputs.install_chrome }}) { $apps += "googlechrome" }
+        if (${{ inputs.install_7zip }}) { $apps += "7zip" }
+        if (${{ inputs.install_notepadpp }}) { $apps += "notepadplusplus" }
+        if (${{ inputs.install_everything }}) { $apps += "everything" }
+        if (${{ inputs.install_winrar }}) { $apps += "winrar" }
+        if (${{ inputs.install_vscode }}) { $apps += "vscode" }
+        if (${{ inputs.install_anydesk }}) { $apps += "anydesk" }
+        if (${{ inputs.install_ffmpeg }}) { $apps += "ffmpeg" }
+        if (${{ inputs.install_vlc }}) { $apps += "vlc" }
         
-        # Pin Chrome to taskbar
-        $shell = New-Object -ComObject Shell.Application
-        $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-        $shell.Namespace(0).ParseName($path).InvokeVerb("taskbarpin")
-        
-        # Pin VS Code to taskbar
-        $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
-        if (Test-Path $vscodePath) {
-          $shell.Namespace(0).ParseName($vscodePath).InvokeVerb("taskbarpin")
+        if ($apps.Count -gt 0) {
+          $appList = $apps -join " "
+          choco install $appList -y
+          Start-Sleep -Seconds 5
+          
+          # Pin Chrome to taskbar if installed
+          if (${{ inputs.install_chrome }}) {
+            $shell = New-Object -ComObject Shell.Application
+            $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+            if (Test-Path $path) {
+              $shell.Namespace(0).ParseName($path).InvokeVerb("taskbarpin")
+            }
+          }
+          
+          # Pin VS Code to taskbar if installed
+          if (${{ inputs.install_vscode }}) {
+            $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
+            if (Test-Path $vscodePath) {
+              $shell = New-Object -ComObject Shell.Application
+              $shell.Namespace(0).ParseName($vscodePath).InvokeVerb("taskbarpin")
+            }
+          }
+          
+          Write-Host "✅ Selected applications installed and pinned to taskbar"
+        } else {
+          Write-Host "ℹ️ No applications selected for installation"
         }
-        
-        Write-Host "✅ Applications installed and pinned to taskbar"
 
     - name: Install Sysinternals Suite
+      if: inputs.install_sysinternals
       run: |
         choco install sysinternals -y
         Write-Host "✅ Sysinternals Suite installed"
 
     - name: Remove All Browser Organization Policies
+      if: inputs.remove_browser_policies
       shell: powershell
       run: |
         # Target registry paths where "Managed by your organization" policies live
@@ -60,8 +168,8 @@ jobs:
         Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
         Write-Host "All browser enterprise configurations cleared!"
 
-    
     - name: Install Ghostery Extension for Chrome
+      if: inputs.install_ghostery
       run: |
         try {
           $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -104,6 +212,7 @@ jobs:
         }
 
     - name: Install WSL
+      if: inputs.install_wsl
       run: |
         dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
         dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
@@ -185,6 +294,7 @@ jobs:
         Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText $password -Force)
 
     - name: Configure Power and Sleep Settings
+      if: inputs.configure_power
       run: |
         # Enable Ultimate Performance power plan
         powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
@@ -206,6 +316,7 @@ jobs:
         Write-Host "✅ Ultimate Performance plan enabled, sleep/hibernation disabled"
 
     - name: Configure Desktop Icons and Settings
+      if: inputs.configure_desktop
       run: |
         # Create the registry path if it doesn't exist
         $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
@@ -238,12 +349,14 @@ jobs:
         Write-Host "✅ Desktop icons configured"
 
     - name: Disable Windows 11 Right Click Context Menu (Force Windows 10 Style)
+      if: inputs.disable_win11_context
       run: |
         # Force Windows 10 style context menu
         reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
         Write-Host "✅ Windows 10 style context menu enabled"
 
     - name: Configure Windows Appearance, Performance, and Taskbar
+      if: inputs.configure_appearance
       run: |
         # Set Dark Theme
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
@@ -279,6 +392,7 @@ jobs:
         Write-Host "✅ All theme and performance settings applied"
 
     - name: Disable Telemetry and Unnecessary Services
+      if: inputs.disable_telemetry
       run: |
         # Disable Telemetry
         Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
@@ -309,6 +423,7 @@ jobs:
         Write-Host "✅ Telemetry and unnecessary services disabled"
 
     - name: Disable Windows Search Indexing
+      if: inputs.disable_search_index
       run: |
         # Disable Windows Search service (already disabled in previous step, but ensure it's stopped)
         Stop-Service "WSearch" -Force -ErrorAction SilentlyContinue
@@ -345,6 +460,7 @@ jobs:
         Write-Host "✅ Windows Search indexing disabled"
 
     - name: Disable OneDrive
+      if: inputs.disable_onedrive
       run: |
         # Disable OneDrive via Group Policy
         if (!(Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive")) {
@@ -365,8 +481,15 @@ jobs:
       run: |
         $batchContent = @"
         @echo off
-        echo Creating stop signal...
+        echo Creating stop signal and logging out of Tailscale...
+        
+        :: Create stop signal file
         echo. > "C:\Users\runneradmin\Documents\stopmachine"
+        
+        :: Logout of Tailscale
+        "C:\Program Files\Tailscale\tailscale.exe" logout
+        
+        echo ✅ Stop signal created and Tailscale logged out
         echo Machine will shut down within 3 minutes.
         echo You can close this window.
         timeout /t 5 /nobreak >nul
@@ -378,7 +501,7 @@ jobs:
         $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
         
         Write-Host "✅ Self-destruct batch script created at: $batchPath"
-        Write-Host "   Run this script to signal the VM to shut down"
+        Write-Host "   Run this script to signal the VM to shut down and logout Tailscale"
         
     - name: Final Restart Explorer (Apply All Changes)
       run: |
@@ -393,7 +516,17 @@ jobs:
       env:
         RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
       run: |
-        $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+        # Fixed session duration: 5 hours 50 minutes = 21000 seconds
+        $sessionSeconds = 21000
+        
+        # Get Tailscale IP
+        $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
+        if (Test-Path $tailscalePath) {
+          $ip = & $tailscalePath ip -4
+        } else {
+          $ip = "Tailscale not installed"
+        }
+        
         $password = $env:RDP_PASSWORD
         $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
         
@@ -407,12 +540,12 @@ jobs:
         Write-Host "Connect via SSH: ssh runneradmin@$ip"
         Write-Host "Connect via RDP: $ip`:3389"
         Write-Host "=========================================="
-        Write-Host "This session will run for 5 hrs and 50 mins"
+        Write-Host "This session will run for 5 hours and 50 minutes"
         Write-Host "OR until you run the 'Stop-VM.bat' script on the desktop"
         Write-Host "=========================================="
 
         # Run for 5 hours 50 minutes (21,000 seconds)
-        $endTime = (Get-Date).AddSeconds(21000)
+        $endTime = (Get-Date).AddSeconds($sessionSeconds)
         $lastLogMinute = -1
         
         while ((Get-Date) -lt $endTime) {
@@ -422,7 +555,7 @@ jobs:
             if (Test-Path $stopFile) {
                 Write-Host "=========================================="
                 Write-Host "🛑 Self-destruct signal detected!"
-                Write-Host "Removing stop file and shutting down..."
+                Write-Host "Removing stop file..."
                 Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
                 Write-Host "=========================================="
                 break
@@ -433,10 +566,20 @@ jobs:
             $currentMinute = [math]::Floor($remaining / 5) * 5
             if ($currentMinute -ne $lastLogMinute -and $remaining -gt 0) {
                 $lastLogMinute = $currentMinute
-                Write-Host "$remaining minutes remaining"
+                $remainingHours = [math]::Floor($remaining / 60)
+                $remainingMins = [math]::Round($remaining % 60)
+                Write-Host "$remainingHours hours $remainingMins minutes remaining"
             }
         }
         
         Write-Host "=========================================="
         Write-Host "Session complete - System is shutting down"
         Write-Host "=========================================="
+
+    - name: Logout Tailscale (Final Cleanup)
+      if: always()
+      shell: pwsh
+      run: |
+        Write-Host "Logging out of Tailscale..."
+        & "C:\Program Files\Tailscale\tailscale.exe" logout
+        Write-Host "Logged out successfully"
