@@ -179,31 +179,27 @@ jobs:
                     mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml/
                     
                     # Disable compositing for better performance
-                    cat > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << 'EOF'
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <channel name="xfwm4" version="1.0">
-                        <property name="general" type="empty">
-                            <property name="use_compositing" type="bool" value="false"/>
-                            <property name="theme" type="string" value="Default"/>
-                        </property>
-                    </channel>
-                    EOF
+                    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+                        '<channel name="xfwm4" version="1.0">' \
+                        '    <property name="general" type="empty">' \
+                        '        <property name="use_compositing" type="bool" value="false"/>' \
+                        '        <property name="theme" type="string" value="Default"/>' \
+                        '    </property>' \
+                        '</channel>' > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
                     
                     # Configure panel
-                    cat > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml << 'EOF'
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <channel name="xfce4-panel" version="1.0">
-                        <property name="panels" type="array">
-                            <value type="int" value="1"/>
-                            <property name="panel-1" type="empty">
-                                <property name="position" type="string" value="p=6;x=0;y=0"/>
-                                <property name="length" type="uint" value="100"/>
-                                <property name="position-locked" type="bool" value="true"/>
-                                <property name="size" type="uint" value="30"/>
-                            </property>
-                        </property>
-                    </channel>
-                    EOF
+                    printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>' \
+                        '<channel name="xfce4-panel" version="1.0">' \
+                        '    <property name="panels" type="array">' \
+                        '        <value type="int" value="1"/>' \
+                        '        <property name="panel-1" type="empty">' \
+                        '            <property name="position" type="string" value="p=6;x=0;y=0"/>' \
+                        '            <property name="length" type="uint" value="100"/>' \
+                        '            <property name="position-locked" type="bool" value="true"/>' \
+                        '            <property name="size" type="uint" value="30"/>' \
+                        '        </property>' \
+                        '    </property>' \
+                        '</channel>' > ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
 
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
@@ -324,31 +320,31 @@ jobs:
                     # Chrome launcher
                     if [ "${{ inputs.install_chrome }}" = "true" ]; then
                         cat > ~/.local/share/applications/google-chrome.desktop << 'EOF'
-                        [Desktop Entry]
-                        Version=1.0
-                        Name=Google Chrome
-                        Comment=Access the Internet
-                        Exec=google-chrome-stable %U
-                        Icon=google-chrome
-                        Terminal=false
-                        Type=Application
-                        Categories=Network;WebBrowser;
-                        EOF
+                    [Desktop Entry]
+                    Version=1.0
+                    Name=Google Chrome
+                    Comment=Access the Internet
+                    Exec=google-chrome-stable %U
+                    Icon=google-chrome
+                    Terminal=false
+                    Type=Application
+                    Categories=Network;WebBrowser;
+                    EOF
                     fi
                     
                     # VS Code launcher
                     if [ "${{ inputs.install_vscode }}" = "true" ]; then
                         cat > ~/.local/share/applications/code.desktop << 'EOF'
-                        [Desktop Entry]
-                        Version=1.0
-                        Name=VS Code
-                        Comment=Code Editing
-                        Exec=code %F
-                        Icon=code
-                        Terminal=false
-                        Type=Application
-                        Categories=Development;IDE;
-                        EOF
+                    [Desktop Entry]
+                    Version=1.0
+                    Name=VS Code
+                    Comment=Code Editing
+                    Exec=code %F
+                    Icon=code
+                    Terminal=false
+                    Type=Application
+                    Categories=Development;IDE;
+                    EOF
                     fi
                     
                     echo "✅ Desktop launchers created"
