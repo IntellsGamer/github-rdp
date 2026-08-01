@@ -4,85 +4,99 @@ on:
   workflow_dispatch:
     inputs:
       install_chrome:
-        description: 'Install Google Chrome'
+        description: "Install Google Chrome"
         type: boolean
         default: true
       install_7zip:
-        description: 'Install 7-Zip'
+        description: "Install 7-Zip"
         type: boolean
         default: true
       install_notepadpp:
-        description: 'Install Notepad++'
+        description: "Install Notepad++"
         type: boolean
         default: true
       install_everything:
-        description: 'Install Everything Search'
+        description: "Install Everything Search"
         type: boolean
         default: true
       install_winrar:
-        description: 'Install WinRAR'
+        description: "Install WinRAR"
         type: boolean
         default: true
       install_vscode:
-        description: 'Install VS Code'
+        description: "Install VS Code"
         type: boolean
         default: true
       install_anydesk:
-        description: 'Install AnyDesk'
+        description: "Install AnyDesk"
         type: boolean
         default: true
       install_ffmpeg:
-        description: 'Install FFmpeg'
+        description: "Install FFmpeg"
         type: boolean
         default: true
       install_vlc:
-        description: 'Install VLC Player'
+        description: "Install VLC Player"
         type: boolean
         default: true
       install_sysinternals:
-        description: 'Install Sysinternals Suite'
+        description: "Install Sysinternals Suite"
         type: boolean
         default: false
       remove_browser_policies:
-        description: 'Remove Browser Organization Policies'
+        description: "Remove Browser Organization Policies"
         type: boolean
         default: true
       install_ghostery:
-        description: 'Install Ghostery Extension for Chrome'
+        description: "Install Ghostery Extension for Chrome"
         type: boolean
         default: false
       install_wsl:
-        description: 'Install WSL'
+        description: "Install WSL"
         type: boolean
         default: true
       configure_power:
-        description: 'Configure Power and Sleep Settings'
+        description: "Configure Power and Sleep Settings"
         type: boolean
         default: true
       configure_desktop:
-        description: 'Configure Desktop Icons and Settings'
+        description: "Configure Desktop Icons and Settings"
         type: boolean
         default: true
       disable_win11_context:
-        description: 'Disable Windows 11 Context Menu'
+        description: "Disable Windows 11 Context Menu"
         type: boolean
         default: true
       configure_appearance:
-        description: 'Configure Windows Appearance and Performance'
+        description: "Configure Windows Appearance and Performance"
         type: boolean
         default: true
       disable_telemetry:
-        description: 'Disable Telemetry and Services'
+        description: "Disable Telemetry and Services"
         type: boolean
         default: true
       disable_search_index:
-        description: 'Disable Windows Search Indexing'
+        description: "Disable Windows Search Indexing"
         type: boolean
         default: true
       disable_onedrive:
-        description: 'Disable OneDrive'
+        description: "Disable OneDrive"
         type: boolean
         default: true
+    legitimate_use_case:
+      description: "Select your legitimate use case (required)"
+      type: choice
+      options:
+        - "Debugging Windows-specific build failure"
+        - "Testing GUI application in GitHub runner environment"
+        - "Validating complex build scripts interactively"
+        - "Investigating CI/CD pipeline error"
+        - "Other legitimate development purpose"
+      required: true
+    use_case_description:
+      description: "Briefly describe your debugging scenario (max 200 chars)"
+      type: string
+      required: true
 
 jobs:
   build:
@@ -90,503 +104,519 @@ jobs:
     timeout-minutes: 9999
 
     steps:
-    - name: Install Applications (Chrome, 7-Zip, Notepad++, Everything, WinRAR, VS Code, AnyDesk, FFmpeg, VLC)
-      if: inputs.install_chrome || inputs.install_7zip || inputs.install_notepadpp || inputs.install_everything || inputs.install_winrar || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
-      shell: pwsh
-      run: |
-        $apps = @()
-        if ('${{ inputs.install_chrome }}' -eq 'true') { $apps += "googlechrome" }
-        if ('${{ inputs.install_7zip }}' -eq 'true') { $apps += "7zip" }
-        if ('${{ inputs.install_notepadpp }}' -eq 'true') { $apps += "notepadplusplus" }
-        if ('${{ inputs.install_everything }}' -eq 'true') { $apps += "everything" }
-        if ('${{ inputs.install_winrar }}' -eq 'true') { $apps += "winrar" }
-        if ('${{ inputs.install_vscode }}' -eq 'true') { $apps += "vscode" }
-        if ('${{ inputs.install_anydesk }}' -eq 'true') { $apps += "anydesk" }
-        if ('${{ inputs.install_ffmpeg }}' -eq 'true') { $apps += "ffmpeg" }
-        if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
-        
-        if ($apps.Count -gt 0) {
-          # Install each package individually
-          foreach ($app in $apps) {
-            Write-Host "Installing $app..."
-            choco install $app -y
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "⚠️ Failed to install $app"
+      - name: Install Applications (Chrome, 7-Zip, Notepad++, Everything, WinRAR, VS Code, AnyDesk, FFmpeg, VLC)
+        if: inputs.install_chrome || inputs.install_7zip || inputs.install_notepadpp || inputs.install_everything || inputs.install_winrar || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+        shell: pwsh
+        run: |
+          $apps = @()
+          if ('${{ inputs.install_chrome }}' -eq 'true') { $apps += "googlechrome" }
+          if ('${{ inputs.install_7zip }}' -eq 'true') { $apps += "7zip" }
+          if ('${{ inputs.install_notepadpp }}' -eq 'true') { $apps += "notepadplusplus" }
+          if ('${{ inputs.install_everything }}' -eq 'true') { $apps += "everything" }
+          if ('${{ inputs.install_winrar }}' -eq 'true') { $apps += "winrar" }
+          if ('${{ inputs.install_vscode }}' -eq 'true') { $apps += "vscode" }
+          if ('${{ inputs.install_anydesk }}' -eq 'true') { $apps += "anydesk" }
+          if ('${{ inputs.install_ffmpeg }}' -eq 'true') { $apps += "ffmpeg" }
+          if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
+
+          if ($apps.Count -gt 0) {
+            # Install each package individually
+            foreach ($app in $apps) {
+              Write-Host "Installing $app..."
+              choco install $app -y
+              if ($LASTEXITCODE -ne 0) {
+                Write-Host "⚠️ Failed to install $app"
+              }
             }
-          }
-          Start-Sleep -Seconds 5
-          
-          # Pin Chrome to taskbar if installed
-          if ('${{ inputs.install_chrome }}' -eq 'true') {
-            $shell = New-Object -ComObject Shell.Application
-            $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-            if (Test-Path $path) {
-              $shell.Namespace(0).ParseName($path).InvokeVerb("taskbarpin")
-            }
-          }
-          
-          # Pin VS Code to taskbar if installed
-          if ('${{ inputs.install_vscode }}' -eq 'true') {
-            $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
-            if (Test-Path $vscodePath) {
+            Start-Sleep -Seconds 5
+            
+            # Pin Chrome to taskbar if installed
+            if ('${{ inputs.install_chrome }}' -eq 'true') {
               $shell = New-Object -ComObject Shell.Application
-              $shell.Namespace(0).ParseName($vscodePath).InvokeVerb("taskbarpin")
+              $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+              if (Test-Path $path) {
+                $shell.Namespace(0).ParseName($path).InvokeVerb("taskbarpin")
+              }
+            }
+            
+            # Pin VS Code to taskbar if installed
+            if ('${{ inputs.install_vscode }}' -eq 'true') {
+              $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
+              if (Test-Path $vscodePath) {
+                $shell = New-Object -ComObject Shell.Application
+                $shell.Namespace(0).ParseName($vscodePath).InvokeVerb("taskbarpin")
+              }
+            }
+            
+            Write-Host "✅ Selected applications installed and pinned to taskbar"
+          } else {
+            Write-Host "ℹ️ No applications selected for installation"
+          }
+
+      - name: Install Sysinternals Suite
+        if: inputs.install_sysinternals
+        run: |
+          choco install sysinternals -y
+          Write-Host "✅ Sysinternals Suite installed"
+
+      - name: Remove All Browser Organization Policies
+        if: inputs.remove_browser_policies
+        shell: powershell
+        run: |
+          # Target registry paths where "Managed by your organization" policies live
+          $browserPolicies = @(
+              "HKLM:\SOFTWARE\Policies\Google\Chrome",
+              "HKCU:\SOFTWARE\Policies\Google\Chrome",
+              "HKLM:\SOFTWARE\Policies\Microsoft\Edge",
+              "HKCU:\SOFTWARE\Policies\Microsoft\Edge",
+              "HKLM:\SOFTWARE\Policies\Mozilla\Firefox",
+              "HKCU:\SOFTWARE\Policies\Mozilla\Firefox",
+              "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave",
+              "HKCU:\SOFTWARE\Policies\BraveSoftware\Brave",
+              "HKLM:\SOFTWARE\Policies\Vivaldi",
+              "HKCU:\SOFTWARE\Policies\Vivaldi"
+          )
+
+          # Force delete the browser policy keys
+          foreach ($path in $browserPolicies) {
+              if (Test-Path $path) {
+                  Remove-Item -Path $path -Recurse -Force
+                  Write-Host "Successfully un-managed: $path"
+              }
+          }
+
+          # Restart the Windows Explorer shell to apply registry changes immediately
+          Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+          Write-Host "All browser enterprise configurations cleared!"
+
+      - name: Install Ghostery Extension for Chrome
+        if: inputs.install_ghostery
+        run: |
+          try {
+            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+            if (Test-Path $chromePath) {
+              # Download Ghostery extension CRX
+              $extensionUrl = "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
+              $crxPath = "$env:TEMP\ghostery.crx"
+              Invoke-WebRequest -Uri $extensionUrl -OutFile $crxPath -ErrorAction Stop
+              
+              # Get Chrome profile path
+              $profilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default"
+              
+              # Create extensions folder if it doesn't exist
+              $extensionsPath = "$profilePath\Extensions\mlomiejdfkolichcflejclcbmpeaniij"
+              New-Item -Path $extensionsPath -ItemType Directory -Force | Out-Null
+              
+              # Unzip the CRX (CRX is a zip file with a different header)
+              # We'll use 7-Zip to extract since it's already installed
+              $tempExtractPath = "$env:TEMP\ghostery_extract"
+              New-Item -Path $tempExtractPath -ItemType Directory -Force | Out-Null
+              
+              # Use 7-Zip to extract
+              $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+              if (Test-Path $sevenZip) {
+                & $sevenZip x $crxPath -o"$tempExtractPath" -y | Out-Null
+                
+                # Copy the extension to Chrome's extensions folder
+                Copy-Item -Path "$tempExtractPath\*" -Destination $extensionsPath -Recurse -Force
+                
+                # Clean up
+                Remove-Item -Path $tempExtractPath -Recurse -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $crxPath -Force -ErrorAction SilentlyContinue
+                
+                Write-Host "✅ Ghostery extension installed"
+              }
             }
           }
+          catch {
+            Write-Host "⚠️ Could not install Ghostery extension: $_"
+          }
+
+      - name: Install WSL
+        if: inputs.install_wsl
+        run: |
+          dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+          dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+          wsl --set-default-version 2
+          Write-Host "✅ WSL installed successfully"
+
+      - name: Install OpenSSH Server
+        run: |
+          Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+          Start-Service sshd
+          Set-Service -Name sshd -StartupType 'Automatic'
+          Write-Host "✅ OpenSSH installed and started"
+
+      - name: Configure Firewall for SSH and RDP
+        run: |
+          # RDP Firewall Rule
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+          # SSH Firewall Rule - Check if exists first
+          $ruleExists = Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
+          if (-not $ruleExists) {
+            New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+            Write-Host "✅ SSH firewall rule created"
+          } else {
+            Write-Host "✅ SSH firewall rule already exists"
+          }
+
+          # IIS Firewall Rule
+          $iisRuleExists = Get-NetFirewallRule -Name "IIS-HTTP-In-TCP" -ErrorAction SilentlyContinue
+          if (-not $iisRuleExists) {
+            New-NetFirewallRule -Name "IIS-HTTP-In-TCP" -DisplayName "IIS HTTP" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 80
+            Write-Host "✅ IIS HTTP firewall rule created"
+          }
+
+          Write-Host "✅ Firewall rules configured"
+
+      - name: Download Tailscale MSI
+        run: |
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.98.10-amd64.msi" -OutFile "tailscale.msi"
+
+      - name: Install Tailscale
+        run: |
+          msiexec /i tailscale.msi /quiet /norestart
+          Start-Sleep -Seconds 10
+          if (Test-Path "C:\Program Files\Tailscale\tailscale.exe") {
+            Write-Host "✅ Tailscale installed successfully"
+          } else {
+            Write-Host "❌ Tailscale installation failed"
+            exit 1
+          }
+
+      - name: Start Tailscale
+        shell: pwsh
+        env:
+          TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        run: |
+          $tailscaleKey = $env:TAILSCALE_AUTH_KEY
+          if ([string]::IsNullOrEmpty($tailscaleKey)) {
+            Write-Host "❌ TAILSCALE_AUTH_KEY environment variable is not set"
+            exit 1
+          }
+          & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key $tailscaleKey
+
+      - name: Enable Remote Desktop
+        run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+
+      - name: Set User Authentication
+        run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+
+      - name: Set User Password
+        env:
+          RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+        run: |
+          $password = $env:RDP_PASSWORD
+          if ([string]::IsNullOrEmpty($password)) {
+            Write-Host "❌ RDP_PASSWORD environment variable is not set"
+            exit 1
+          }
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText $password -Force)
+
+      - name: Configure Power and Sleep Settings
+        if: inputs.configure_power
+        run: |
+          # Enable Ultimate Performance power plan
+          powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
+          powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
+
+          # Set monitor to never turn off
+          powercfg -change -monitor-timeout-ac 0
+
+          # Set disk to never turn off
+          powercfg -change -disk-timeout-ac 0
+
+          # Disable sleep mode
+          powercfg -change -standby-timeout-ac 0
+          powercfg -change -hibernate-timeout-ac 0
+
+          # Disable hibernation completely
+          powercfg -hibernate off
+
+          Write-Host "✅ Ultimate Performance plan enabled, sleep/hibernation disabled"
+
+      - name: Configure Desktop Icons and Settings
+        if: inputs.configure_desktop
+        run: |
+          # Create the registry path if it doesn't exist
+          $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
+          if (!(Test-Path $regPath)) {
+            New-Item -Path $regPath -Force | Out-Null
+          }
+
+          # Show This PC, Control Panel, User's Files on Desktop
+          # 0 = Show, 1 = Hide
+          Set-ItemProperty -Path $regPath -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord  # This PC
+          Set-ItemProperty -Path $regPath -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord  # Control Panel
+          Set-ItemProperty -Path $regPath -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord  # User's Files
+
+          # Also set in ClassicStartMenu for compatibility
+          $regPathClassic = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu"
+          if (!(Test-Path $regPathClassic)) {
+            New-Item -Path $regPathClassic -Force | Out-Null
+          }
+          Set-ItemProperty -Path $regPathClassic -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord
+          Set-ItemProperty -Path $regPathClassic -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord
+          Set-ItemProperty -Path $regPathClassic -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord
+
+          # Enable Auto Arrange Icons
+          $desktopBagPath = "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop"
+          if (!(Test-Path $desktopBagPath)) {
+            New-Item -Path $desktopBagPath -Force | Out-Null
+          }
+          Set-ItemProperty -Path $desktopBagPath -Name "FFlags" -Value 1075839525 -Type DWord
+
+          Write-Host "✅ Desktop icons configured"
+
+      - name: Disable Windows 11 Right Click Context Menu (Force Windows 10 Style)
+        if: inputs.disable_win11_context
+        run: |
+          # Force Windows 10 style context menu
+          reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
+          Write-Host "✅ Windows 10 style context menu enabled"
+
+      - name: Configure Windows Appearance, Performance, and Taskbar
+        if: inputs.configure_appearance
+        run: |
+          # Set Dark Theme
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
+
+          # Set Solid Black Background
+          Set-ItemProperty -Path "HKCU:\Control Panel\Colors" -Name "Background" -Value "0 0 0"
+          Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "Wallpaper" -Value ""
+
+          # Disable ALL Visual Effects EXCEPT Font Smoothing
+          $newMask = [byte[]]@(0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)
+          Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $newMask
+
+          # Disable all visual effects via System Performance Settings
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2
+
+          # Disable specific visual effects
+          Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0"
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewAlphaSelect" -Value 0
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewShadow" -Value 0
+
+          # Taskbar Settings - Align Left
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
+
+          # Hide Search Box/Task View
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0
+
+          # Disable Transparency Effects
+          Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0
+
+          Write-Host "✅ All theme and performance settings applied"
+
+      - name: Disable Telemetry and Unnecessary Services
+        if: inputs.disable_telemetry
+        run: |
+          # Disable Telemetry
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+
+          # Disable Unnecessary Services
+          $services = @(
+              "DiagTrack",
+              "dmwappushservice",
+              "MapsBroker",
+              "lfsvc",
+              "BthAvctpSvc",
+              "Fax",
+              "XboxNetApiSvc",
+              "XblAuthManager",
+              "XblGameSave",
+              "XboxGipSvc",
+              "wisvc",
+              "WSearch"
+          )
+
+          foreach ($service in $services) {
+              Stop-Service $service -ErrorAction SilentlyContinue
+              Set-Service $service -StartupType Disabled -ErrorAction SilentlyContinue
+          }
+
+          Write-Host "✅ Telemetry and unnecessary services disabled"
+
+      - name: Disable Windows Search Indexing
+        if: inputs.disable_search_index
+        run: |
+          # Disable Windows Search service (already disabled in previous step, but ensure it's stopped)
+          Stop-Service "WSearch" -Force -ErrorAction SilentlyContinue
+          Set-Service "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
+
+          # Disable indexing via registry
+          $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
+          if (!(Test-Path $regPath)) {
+            New-Item -Path $regPath -Force | Out-Null
+          }
+
+          Set-ItemProperty -Path $regPath -Name "DisableIndexer" -Value 1 -Type DWord -Force
+          Set-ItemProperty -Path $regPath -Name "DisableBackoff" -Value 1 -Type DWord -Force
+          Set-ItemProperty -Path $regPath -Name "PreventIndexingOutlook" -Value 1 -Type DWord -Force
+
+          # Disable indexing for all drives
+          $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 }
+          foreach ($drive in $drives) {
+            $driveLetter = $drive.DeviceID
+            Write-Host "Disabling indexing on $driveLetter"
+            & fsutil.exe behavior set disablelastaccess 1
+            & fsutil.exe behavior set disableencryption 1
+          }
+
+          # Remove Search Indexer from running processes
+          Get-Process -Name "SearchIndexer" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+          # Delete the search index database
+          $indexLocation = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\"
+          if (Test-Path $indexLocation) {
+            Remove-Item -Path $indexLocation -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          Write-Host "✅ Windows Search indexing disabled"
+
+      - name: Disable OneDrive
+        if: inputs.disable_onedrive
+        run: |
+          # Disable OneDrive via Group Policy
+          if (!(Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive")) {
+            New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Force
+          }
+          Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -Type DWord
+
+          # Stop and disable OneDrive service
+          Stop-Process -Name OneDrive -ErrorAction SilentlyContinue
+          Set-Service -Name OneDriveUpdaterService -StartupType Disabled -ErrorAction SilentlyContinue
+
+          # Remove OneDrive from startup
+          Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -ErrorAction SilentlyContinue
+
+          Write-Host "✅ OneDrive disabled"
+
+      - name: Create Self-Destruct Batch Script on Desktop
+        run: |
+          $batchContent = @"
+          @echo off
+          echo Creating stop signal and logging out of Tailscale...
+
+          :: Create stop signal file
+          echo. > "C:\Users\runneradmin\Documents\stopmachine"
+
+          :: Logout of Tailscale
+          "C:\Program Files\Tailscale\tailscale.exe" logout
+
+          echo ✅ Stop signal created and Tailscale logged out
+          echo Machine will shut down within 3 minutes.
+          echo You can close this window.
+          timeout /t 5 /nobreak >nul
+          exit
+          "@
+
+          $desktopPath = [Environment]::GetFolderPath("Desktop")
+          $batchPath = "$desktopPath\Stop-VM.bat"
+          $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
+
+          Write-Host "✅ Self-destruct batch script created at: $batchPath"
+          Write-Host "   Run this script to signal the VM to shut down and logout Tailscale"
+
+      - name: Final Restart Explorer (Apply All Changes)
+        run: |
+          # Final restart to apply all changes including theme and context menu
+          taskkill /f /im explorer.exe
+          Start-Process explorer.exe
+          Start-Sleep -Seconds 3
+          Write-Host "✅ Explorer restarted - All changes applied"
+
+      - name: Session Activity Logger
+        shell: pwsh
+        run: |
+          # Log that the session was used for development
+          $logPath = "C:\session_activity.log"
           
-          Write-Host "✅ Selected applications installed and pinned to taskbar"
-        } else {
-          Write-Host "ℹ️ No applications selected for installation"
-        }
+          # Log the start
+          "[$(Get-Date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" | Out-File $logPath
+          
+      - name: Monitor Services and Keep Alive with Self-Destruct
+        shell: pwsh
+        env:
+          RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+        run: |
+          # Fixed session duration: 5 hours 50 minutes = 21000 seconds
+          $sessionSeconds = 21000
 
-    - name: Install Sysinternals Suite
-      if: inputs.install_sysinternals
-      run: |
-        choco install sysinternals -y
-        Write-Host "✅ Sysinternals Suite installed"
-
-    - name: Remove All Browser Organization Policies
-      if: inputs.remove_browser_policies
-      shell: powershell
-      run: |
-        # Target registry paths where "Managed by your organization" policies live
-        $browserPolicies = @(
-            "HKLM:\SOFTWARE\Policies\Google\Chrome",
-            "HKCU:\SOFTWARE\Policies\Google\Chrome",
-            "HKLM:\SOFTWARE\Policies\Microsoft\Edge",
-            "HKCU:\SOFTWARE\Policies\Microsoft\Edge",
-            "HKLM:\SOFTWARE\Policies\Mozilla\Firefox",
-            "HKCU:\SOFTWARE\Policies\Mozilla\Firefox",
-            "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave",
-            "HKCU:\SOFTWARE\Policies\BraveSoftware\Brave",
-            "HKLM:\SOFTWARE\Policies\Vivaldi",
-            "HKCU:\SOFTWARE\Policies\Vivaldi"
-        )
-    
-        # Force delete the browser policy keys
-        foreach ($path in $browserPolicies) {
-            if (Test-Path $path) {
-                Remove-Item -Path $path -Recurse -Force
-                Write-Host "Successfully un-managed: $path"
-            }
-        }
-        
-        # Restart the Windows Explorer shell to apply registry changes immediately
-        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-        Write-Host "All browser enterprise configurations cleared!"
-
-    - name: Install Ghostery Extension for Chrome
-      if: inputs.install_ghostery
-      run: |
-        try {
-          $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-          if (Test-Path $chromePath) {
-            # Download Ghostery extension CRX
-            $extensionUrl = "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
-            $crxPath = "$env:TEMP\ghostery.crx"
-            Invoke-WebRequest -Uri $extensionUrl -OutFile $crxPath -ErrorAction Stop
-            
-            # Get Chrome profile path
-            $profilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default"
-            
-            # Create extensions folder if it doesn't exist
-            $extensionsPath = "$profilePath\Extensions\mlomiejdfkolichcflejclcbmpeaniij"
-            New-Item -Path $extensionsPath -ItemType Directory -Force | Out-Null
-            
-            # Unzip the CRX (CRX is a zip file with a different header)
-            # We'll use 7-Zip to extract since it's already installed
-            $tempExtractPath = "$env:TEMP\ghostery_extract"
-            New-Item -Path $tempExtractPath -ItemType Directory -Force | Out-Null
-            
-            # Use 7-Zip to extract
-            $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-            if (Test-Path $sevenZip) {
-              & $sevenZip x $crxPath -o"$tempExtractPath" -y | Out-Null
-              
-              # Copy the extension to Chrome's extensions folder
-              Copy-Item -Path "$tempExtractPath\*" -Destination $extensionsPath -Recurse -Force
-              
-              # Clean up
-              Remove-Item -Path $tempExtractPath -Recurse -Force -ErrorAction SilentlyContinue
-              Remove-Item -Path $crxPath -Force -ErrorAction SilentlyContinue
-              
-              Write-Host "✅ Ghostery extension installed"
-            }
+          # Get Tailscale IP
+          $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
+          if (Test-Path $tailscalePath) {
+            $ip = & $tailscalePath ip -4
+          } else {
+            $ip = "Tailscale not installed"
           }
-        }
-        catch {
-          Write-Host "⚠️ Could not install Ghostery extension: $_"
-        }
 
-    - name: Install WSL
-      if: inputs.install_wsl
-      run: |
-        dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-        dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-        wsl --set-default-version 2
-        Write-Host "✅ WSL installed successfully"
+          $password = $env:RDP_PASSWORD
+          $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
 
-    - name: Install OpenSSH Server
-      run: |
-        Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
-        Start-Service sshd
-        Set-Service -Name sshd -StartupType 'Automatic'
-        Write-Host "✅ OpenSSH installed and started"
+          Write-Host "=========================================="
+          Write-Host "✅ RDP Ready - $ip`:3389"
+          Write-Host "✅ SSH Ready - $ip`:22"
+          Write-Host "=========================================="
+          Write-Host " Username: runneradmin"
+          Write-Host " Password is set in Repository Secrets"
+          Write-Host " "
+          Write-Host "Connect via SSH: ssh runneradmin@$ip"
+          Write-Host "Connect via RDP: $ip`:3389"
+          Write-Host " "
+          Write-Host "=========================================="
+          Write-Host "    FOR GITHUB HISTORY LOGGING PURPOSES   "
+          Write-Host " "
+          Write-Host " Legitimate Use Case: ${{ inputs.legitimate_use_case }}"
+          Write-Host " Description: ${{ inputs.use_case_description }}"
+          Write-Host " "
+          Write-Host "=========================================="
+          Write-Host " This session will run for 5 hrs 50 mins"
+          Write-Host " OR until you run the 'Stop-VM.bat' script on the desktop"
+          Write-Host "=========================================="
 
-    - name: Configure Firewall for SSH and RDP
-      run: |
-        # RDP Firewall Rule
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-        
-        # SSH Firewall Rule - Check if exists first
-        $ruleExists = Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
-        if (-not $ruleExists) {
-          New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
-          Write-Host "✅ SSH firewall rule created"
-        } else {
-          Write-Host "✅ SSH firewall rule already exists"
-        }
-        
-        # IIS Firewall Rule
-        $iisRuleExists = Get-NetFirewallRule -Name "IIS-HTTP-In-TCP" -ErrorAction SilentlyContinue
-        if (-not $iisRuleExists) {
-          New-NetFirewallRule -Name "IIS-HTTP-In-TCP" -DisplayName "IIS HTTP" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 80
-          Write-Host "✅ IIS HTTP firewall rule created"
-        }
-        
-        Write-Host "✅ Firewall rules configured"
+          # Run for 5 hours 50 minutes (21,000 seconds)
+          $endTime = (Get-Date).AddSeconds($sessionSeconds)
+          $lastLogMinute = -1
 
-    - name: Download Tailscale MSI
-      run: |
-        Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.98.10-amd64.msi" -OutFile "tailscale.msi"
+          while ((Get-Date) -lt $endTime) {
+              Start-Sleep -Seconds 180  # Check every 3 minutes
+              
+              # Check for self-destruct signal
+              if (Test-Path $stopFile) {
+                  Write-Host "=========================================="
+                  Write-Host "🛑 Self-destruct signal detected!"
+                  Write-Host "Removing stop file..."
+                  Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
+                  Write-Host "=========================================="
+                  break
+              }
+              
+              # Log remaining time every 5 minutes
+              $remaining = [math]::Round(($endTime - (Get-Date)).TotalMinutes)
+              $currentMinute = [math]::Floor($remaining / 5) * 5
+              if ($currentMinute -ne $lastLogMinute -and $remaining -gt 0) {
+                  $lastLogMinute = $currentMinute
+                  $remainingHours = [math]::Floor($remaining / 60)
+                  $remainingMins = [math]::Round($remaining % 60)
+                  Write-Host "$remainingHours hours $remainingMins minutes remaining"
+              }
+          }
 
-    - name: Install Tailscale
-      run: |
-        msiexec /i tailscale.msi /quiet /norestart
-        Start-Sleep -Seconds 10
-        if (Test-Path "C:\Program Files\Tailscale\tailscale.exe") {
-          Write-Host "✅ Tailscale installed successfully"
-        } else {
-          Write-Host "❌ Tailscale installation failed"
-          exit 1
-        }
+          Write-Host "=========================================="
+          Write-Host "Session complete - System is shutting down"
+          Write-Host "=========================================="
 
-    - name: Start Tailscale
-      shell: pwsh
-      env:
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-      run: |
-        $tailscaleKey = $env:TAILSCALE_AUTH_KEY
-        if ([string]::IsNullOrEmpty($tailscaleKey)) {
-          Write-Host "❌ TAILSCALE_AUTH_KEY environment variable is not set"
-          exit 1
-        }
-        & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key $tailscaleKey
-
-    - name: Enable Remote Desktop
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
-
-    - name: Set User Authentication
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-
-    - name: Set User Password
-      env:
-        RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-      run: |
-        $password = $env:RDP_PASSWORD
-        if ([string]::IsNullOrEmpty($password)) {
-          Write-Host "❌ RDP_PASSWORD environment variable is not set"
-          exit 1
-        }
-        Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText $password -Force)
-
-    - name: Configure Power and Sleep Settings
-      if: inputs.configure_power
-      run: |
-        # Enable Ultimate Performance power plan
-        powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
-        powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
-        
-        # Set monitor to never turn off
-        powercfg -change -monitor-timeout-ac 0
-        
-        # Set disk to never turn off
-        powercfg -change -disk-timeout-ac 0
-        
-        # Disable sleep mode
-        powercfg -change -standby-timeout-ac 0
-        powercfg -change -hibernate-timeout-ac 0
-        
-        # Disable hibernation completely
-        powercfg -hibernate off
-        
-        Write-Host "✅ Ultimate Performance plan enabled, sleep/hibernation disabled"
-
-    - name: Configure Desktop Icons and Settings
-      if: inputs.configure_desktop
-      run: |
-        # Create the registry path if it doesn't exist
-        $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
-        if (!(Test-Path $regPath)) {
-          New-Item -Path $regPath -Force | Out-Null
-        }
-        
-        # Show This PC, Control Panel, User's Files on Desktop
-        # 0 = Show, 1 = Hide
-        Set-ItemProperty -Path $regPath -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord  # This PC
-        Set-ItemProperty -Path $regPath -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord  # Control Panel
-        Set-ItemProperty -Path $regPath -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord  # User's Files
-        
-        # Also set in ClassicStartMenu for compatibility
-        $regPathClassic = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu"
-        if (!(Test-Path $regPathClassic)) {
-          New-Item -Path $regPathClassic -Force | Out-Null
-        }
-        Set-ItemProperty -Path $regPathClassic -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord
-        Set-ItemProperty -Path $regPathClassic -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord
-        Set-ItemProperty -Path $regPathClassic -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord
-        
-        # Enable Auto Arrange Icons
-        $desktopBagPath = "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop"
-        if (!(Test-Path $desktopBagPath)) {
-          New-Item -Path $desktopBagPath -Force | Out-Null
-        }
-        Set-ItemProperty -Path $desktopBagPath -Name "FFlags" -Value 1075839525 -Type DWord
-        
-        Write-Host "✅ Desktop icons configured"
-
-    - name: Disable Windows 11 Right Click Context Menu (Force Windows 10 Style)
-      if: inputs.disable_win11_context
-      run: |
-        # Force Windows 10 style context menu
-        reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
-        Write-Host "✅ Windows 10 style context menu enabled"
-
-    - name: Configure Windows Appearance, Performance, and Taskbar
-      if: inputs.configure_appearance
-      run: |
-        # Set Dark Theme
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
-        
-        # Set Solid Black Background
-        Set-ItemProperty -Path "HKCU:\Control Panel\Colors" -Name "Background" -Value "0 0 0"
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "Wallpaper" -Value ""
-        
-        # Disable ALL Visual Effects EXCEPT Font Smoothing
-        $newMask = [byte[]]@(0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $newMask
-        
-        # Disable all visual effects via System Performance Settings
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2
-        
-        # Disable specific visual effects
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0"
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewAlphaSelect" -Value 0
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewShadow" -Value 0
-        
-        # Taskbar Settings - Align Left
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
-        
-        # Hide Search Box/Task View
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0
-        
-        # Disable Transparency Effects
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0
-        
-        Write-Host "✅ All theme and performance settings applied"
-
-    - name: Disable Telemetry and Unnecessary Services
-      if: inputs.disable_telemetry
-      run: |
-        # Disable Telemetry
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
-        
-        # Disable Unnecessary Services
-        $services = @(
-            "DiagTrack",
-            "dmwappushservice",
-            "MapsBroker",
-            "lfsvc",
-            "BthAvctpSvc",
-            "Fax",
-            "XboxNetApiSvc",
-            "XblAuthManager",
-            "XblGameSave",
-            "XboxGipSvc",
-            "wisvc",
-            "WSearch"
-        )
-        
-        foreach ($service in $services) {
-            Stop-Service $service -ErrorAction SilentlyContinue
-            Set-Service $service -StartupType Disabled -ErrorAction SilentlyContinue
-        }
-        
-        Write-Host "✅ Telemetry and unnecessary services disabled"
-
-    - name: Disable Windows Search Indexing
-      if: inputs.disable_search_index
-      run: |
-        # Disable Windows Search service (already disabled in previous step, but ensure it's stopped)
-        Stop-Service "WSearch" -Force -ErrorAction SilentlyContinue
-        Set-Service "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
-        
-        # Disable indexing via registry
-        $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
-        if (!(Test-Path $regPath)) {
-          New-Item -Path $regPath -Force | Out-Null
-        }
-        
-        Set-ItemProperty -Path $regPath -Name "DisableIndexer" -Value 1 -Type DWord -Force
-        Set-ItemProperty -Path $regPath -Name "DisableBackoff" -Value 1 -Type DWord -Force
-        Set-ItemProperty -Path $regPath -Name "PreventIndexingOutlook" -Value 1 -Type DWord -Force
-        
-        # Disable indexing for all drives
-        $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 }
-        foreach ($drive in $drives) {
-          $driveLetter = $drive.DeviceID
-          Write-Host "Disabling indexing on $driveLetter"
-          & fsutil.exe behavior set disablelastaccess 1
-          & fsutil.exe behavior set disableencryption 1
-        }
-        
-        # Remove Search Indexer from running processes
-        Get-Process -Name "SearchIndexer" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        
-        # Delete the search index database
-        $indexLocation = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\"
-        if (Test-Path $indexLocation) {
-          Remove-Item -Path $indexLocation -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        
-        Write-Host "✅ Windows Search indexing disabled"
-
-    - name: Disable OneDrive
-      if: inputs.disable_onedrive
-      run: |
-        # Disable OneDrive via Group Policy
-        if (!(Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive")) {
-          New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Force
-        }
-        Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -Type DWord
-        
-        # Stop and disable OneDrive service
-        Stop-Process -Name OneDrive -ErrorAction SilentlyContinue
-        Set-Service -Name OneDriveUpdaterService -StartupType Disabled -ErrorAction SilentlyContinue
-        
-        # Remove OneDrive from startup
-        Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -ErrorAction SilentlyContinue
-        
-        Write-Host "✅ OneDrive disabled"
-
-    - name: Create Self-Destruct Batch Script on Desktop
-      run: |
-        $batchContent = @"
-        @echo off
-        echo Creating stop signal and logging out of Tailscale...
-        
-        :: Create stop signal file
-        echo. > "C:\Users\runneradmin\Documents\stopmachine"
-        
-        :: Logout of Tailscale
-        "C:\Program Files\Tailscale\tailscale.exe" logout
-        
-        echo ✅ Stop signal created and Tailscale logged out
-        echo Machine will shut down within 3 minutes.
-        echo You can close this window.
-        timeout /t 5 /nobreak >nul
-        exit
-        "@
-        
-        $desktopPath = [Environment]::GetFolderPath("Desktop")
-        $batchPath = "$desktopPath\Stop-VM.bat"
-        $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
-        
-        Write-Host "✅ Self-destruct batch script created at: $batchPath"
-        Write-Host "   Run this script to signal the VM to shut down and logout Tailscale"
-        
-    - name: Final Restart Explorer (Apply All Changes)
-      run: |
-        # Final restart to apply all changes including theme and context menu
-        taskkill /f /im explorer.exe
-        Start-Process explorer.exe
-        Start-Sleep -Seconds 3
-        Write-Host "✅ Explorer restarted - All changes applied"
-
-    - name: Monitor Services and Keep Alive with Self-Destruct
-      shell: pwsh
-      env:
-        RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-      run: |
-        # Fixed session duration: 5 hours 50 minutes = 21000 seconds
-        $sessionSeconds = 21000
-        
-        # Get Tailscale IP
-        $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
-        if (Test-Path $tailscalePath) {
-          $ip = & $tailscalePath ip -4
-        } else {
-          $ip = "Tailscale not installed"
-        }
-        
-        $password = $env:RDP_PASSWORD
-        $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
-        
-        Write-Host "=========================================="
-        Write-Host "✅ RDP Ready - $ip`:3389"
-        Write-Host "✅ SSH Ready - $ip`:22"
-        Write-Host "=========================================="
-        Write-Host " Username: runneradmin"
-        Write-Host " Password is set in Repository Secrets"
-        Write-Host " "
-        Write-Host "Connect via SSH: ssh runneradmin@$ip"
-        Write-Host "Connect via RDP: $ip`:3389"
-        Write-Host "=========================================="
-        Write-Host "This session will run for 5 hours and 50 minutes"
-        Write-Host "OR until you run the 'Stop-VM.bat' script on the desktop"
-        Write-Host "=========================================="
-
-        # Run for 5 hours 50 minutes (21,000 seconds)
-        $endTime = (Get-Date).AddSeconds($sessionSeconds)
-        $lastLogMinute = -1
-        
-        while ((Get-Date) -lt $endTime) {
-            Start-Sleep -Seconds 180  # Check every 3 minutes
-            
-            # Check for self-destruct signal
-            if (Test-Path $stopFile) {
-                Write-Host "=========================================="
-                Write-Host "🛑 Self-destruct signal detected!"
-                Write-Host "Removing stop file..."
-                Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
-                Write-Host "=========================================="
-                break
-            }
-            
-            # Log remaining time every 5 minutes
-            $remaining = [math]::Round(($endTime - (Get-Date)).TotalMinutes)
-            $currentMinute = [math]::Floor($remaining / 5) * 5
-            if ($currentMinute -ne $lastLogMinute -and $remaining -gt 0) {
-                $lastLogMinute = $currentMinute
-                $remainingHours = [math]::Floor($remaining / 60)
-                $remainingMins = [math]::Round($remaining % 60)
-                Write-Host "$remainingHours hours $remainingMins minutes remaining"
-            }
-        }
-        
-        Write-Host "=========================================="
-        Write-Host "Session complete - System is shutting down"
-        Write-Host "=========================================="
-
-    - name: Logout Tailscale (Final Cleanup)
-      if: always()
-      shell: pwsh
-      run: |
-        Write-Host "🔄 Logging out of Tailscale..."
-        & "C:\Program Files\Tailscale\tailscale.exe" logout
-        Write-Host "✅ Tailscale logged out"
+      - name: Logout Tailscale (Final Cleanup)
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "🔄 Logging out of Tailscale..."
+          & "C:\Program Files\Tailscale\tailscale.exe" logout
+          Write-Host "✅ Tailscale logged out"
