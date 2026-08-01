@@ -84,7 +84,7 @@ on:
                 type: boolean
                 default: true
             legitimate_use_case:
-                description: "Select your legitimate use case (required)"
+                description: "Select your legitimate use case"
                 type: choice
                 options:
                     - "Debugging Windows-specific build failure"
@@ -92,7 +92,8 @@ on:
                     - "Validating complex build scripts interactively"
                     - "Investigating CI/CD pipeline error"
                     - "Other legitimate development purpose"
-                required: true
+                default: "Other legitimate development purpose"
+                required: false
             use_case_description:
                 description: "Briefly describe your debugging scenario (max 200 chars)"
                 type: string
