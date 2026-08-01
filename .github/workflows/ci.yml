@@ -39,6 +39,10 @@ on:
                 description: "Install VLC Player"
                 type: boolean
                 default: true
+            install_opencode:
+                description: "Install OpenCode AI Agent"
+                type: boolean
+                default: true
             install_sysinternals:
                 description: "Install Sysinternals Suite"
                 type: boolean
@@ -155,6 +159,12 @@ jobs:
                         Write-Host "ℹ️ No applications selected for installation"
                     }
 
+            - name: Install OpenCode AI
+              if: inputs.install_opencode
+              run: |
+                    npm i -g opencode-ai
+                    Write-Host "✅ OpenCode installed"
+            
             - name: Install Sysinternals Suite
               if: inputs.install_sysinternals
               run: |
