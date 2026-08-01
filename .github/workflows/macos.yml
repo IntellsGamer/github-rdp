@@ -1,4 +1,4 @@
-name: CI-RDP-macOS
+name: CI-RDP-Windows
 
 on:
     workflow_dispatch:
@@ -8,13 +8,21 @@ on:
                 type: boolean
                 default: true
             install_7zip:
-                description: "Install 7-Zip (p7zip)"
+                description: "Install 7-Zip"
                 type: boolean
                 default: true
             install_notepadpp:
-                description: "Install Notepad++ (via Wine - optional)"
+                description: "Install Notepad++"
                 type: boolean
-                default: false
+                default: true
+            install_everything:
+                description: "Install Everything Search"
+                type: boolean
+                default: true
+            install_winrar:
+                description: "Install WinRAR"
+                type: boolean
+                default: true
             install_vscode:
                 description: "Install VS Code"
                 type: boolean
@@ -39,43 +47,59 @@ on:
                 description: "Install Kilo CLI"
                 type: boolean
                 default: true
+            install_sysinternals:
+                description: "Install Sysinternals Suite"
+                type: boolean
+                default: false
+            remove_browser_policies:
+                description: "Remove Browser Organization Policies"
+                type: boolean
+                default: true
             set_py_default_3_12:
-                description: "Set default Python 3.12"
+                description: "Set default python 'py' launcher to 3.12"
                 type: boolean
                 default: true
             install_ghostery:
                 description: "Install Ghostery Extension for Chrome"
                 type: boolean
                 default: false
-            install_tailscale:
-                description: "Install Tailscale"
-                type: boolean
-                default: true
-            install_homebrew:
-                description: "Install Homebrew (if not present)"
-                type: boolean
-                default: true
-            enable_ssh:
-                description: "Enable SSH Remote Login"
+            install_wsl:
+                description: "Install WSL"
                 type: boolean
                 default: true
             configure_power:
                 description: "Configure Power and Sleep Settings"
                 type: boolean
                 default: true
+            configure_desktop:
+                description: "Configure Desktop Icons and Settings"
+                type: boolean
+                default: true
+            disable_win11_context:
+                description: "Disable Windows 11 Context Menu"
+                type: boolean
+                default: true
             configure_appearance:
-                description: "Configure macOS Appearance"
+                description: "Configure Windows Appearance and Performance"
                 type: boolean
                 default: true
             disable_telemetry:
-                description: "Disable Analytics and Telemetry"
+                description: "Disable Telemetry and Services"
+                type: boolean
+                default: true
+            disable_search_index:
+                description: "Disable Windows Search Indexing"
+                type: boolean
+                default: true
+            disable_onedrive:
+                description: "Disable OneDrive"
                 type: boolean
                 default: true
             legitimate_use_case:
                 description: "Select your legitimate use case"
                 type: choice
                 options:
-                    - "Debugging macOS-specific build failure"
+                    - "Debugging Windows-specific build failure"
                     - "Testing GUI application in GitHub runner environment"
                     - "Validating complex build scripts interactively"
                     - "Investigating CI/CD pipeline error"
@@ -90,318 +114,573 @@ on:
 
 jobs:
     build:
-        runs-on: macos-latest
+        runs-on: windows-latest
         timeout-minutes: 9999
 
         steps:
-            - name: Install Homebrew
-              if: inputs.install_homebrew
+            - name: Install Applications (Chrome, 7-Zip, Notepad++, Everything, WinRAR, VS Code, AnyDesk, FFmpeg, VLC)
+              if: inputs.install_chrome || inputs.install_7zip || inputs.install_notepadpp || inputs.install_everything || inputs.install_winrar || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+              shell: pwsh
               run: |
-                    if ! command -v brew &> /dev/null; then
-                        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-                        eval "$(/opt/homebrew/bin/brew shellenv)"
-                    else
-                        echo "Homebrew already installed"
-                    fi
-                    brew update
+                    $apps = @()
+                    if ('${{ inputs.install_chrome }}' -eq 'true') { $apps += "googlechrome" }
+                    if ('${{ inputs.install_7zip }}' -eq 'true') { $apps += "7zip" }
+                    if ('${{ inputs.install_notepadpp }}' -eq 'true') { $apps += "notepadplusplus" }
+                    if ('${{ inputs.install_everything }}' -eq 'true') { $apps += "everything" }
+                    if ('${{ inputs.install_winrar }}' -eq 'true') { $apps += "winrar" }
+                    if ('${{ inputs.install_vscode }}' -eq 'true') { $apps += "vscode" }
+                    if ('${{ inputs.install_anydesk }}' -eq 'true') { $apps += "anydesk" }
+                    if ('${{ inputs.install_ffmpeg }}' -eq 'true') { $apps += "ffmpeg" }
+                    if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
 
-            - name: Install Applications via Homebrew
-              if: inputs.install_chrome || inputs.install_7zip || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
-              run: |
-                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
-                        brew install --cask google-chrome
-                    fi
-                    if [ "${{ inputs.install_7zip }}" = "true" ]; then
-                        brew install p7zip
-                    fi
-                    if [ "${{ inputs.install_vscode }}" = "true" ]; then
-                        brew install --cask visual-studio-code
-                        # Add VS Code to PATH
-                        export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
-                        echo 'export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"' >> ~/.zprofile
-                    fi
-                    if [ "${{ inputs.install_anydesk }}" = "true" ]; then
-                        brew install --cask anydesk
-                    fi
-                    if [ "${{ inputs.install_ffmpeg }}" = "true" ]; then
-                        brew install ffmpeg
-                    fi
-                    if [ "${{ inputs.install_vlc }}" = "true" ]; then
-                        brew install --cask vlc
-                    fi
+                    if ($apps.Count -gt 0) {
+                        # Install each package individually
+                        foreach ($app in $apps) {
+                            Write-Host "Installing $app..."
+                            choco install $app -y
+                            if ($LASTEXITCODE -ne 0) {
+                                Write-Host "⚠️ Failed to install $app"
+                            }
+                        }
+                        Start-Sleep -Seconds 5
 
-            - name: Install Node.js and npm
-              if: inputs.install_opencode || inputs.install_kilocli
-              run: |
-                    brew install node
-                    echo "Node.js installed"
+                        # Pin Chrome to taskbar if installed
+                        if ('${{ inputs.install_chrome }}' -eq 'true') {
+                            $shell = New-Object -ComObject Shell.Application
+                            $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                            if (Test-Path $path) {
+                                $shell.Namespace(0).ParseName($path).InvokeVerb("taskbarpin")
+                            }
+                        }
+
+                        # Pin VS Code to taskbar if installed
+                        if ('${{ inputs.install_vscode }}' -eq 'true') {
+                            $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
+                            if (Test-Path $vscodePath) {
+                                $shell = New-Object -ComObject Shell.Application
+                                $shell.Namespace(0).ParseName($vscodePath).InvokeVerb("taskbarpin")
+                            }
+                        }
+
+                        Write-Host "✅ Selected applications installed and pinned to taskbar"
+                    } else {
+                        Write-Host "ℹ️ No applications selected for installation"
+                    }
 
             - name: Install OpenCode AI
               if: inputs.install_opencode
               run: |
                     npm i -g opencode-ai
-                    echo "✅ OpenCode installed"
+                    Write-Host "✅ OpenCode installed"
 
             - name: Install Kilo CLI
               if: inputs.install_kilocli
               run: |
                     npm install -g @kilocode/cli
-                    echo "✅ Kilo CLI installed"
-
-            - name: Install Tailscale
-              if: inputs.install_tailscale
+                    Write-Host "✅ Kilo CLI installed"
+            
+            - name: Install Sysinternals Suite
+              if: inputs.install_sysinternals
               run: |
-                  brew install --cask tailscale
-                  echo "✅ Tailscale installed"
+                    choco install sysinternals -y
+                    Write-Host "✅ Sysinternals Suite installed"
 
-            - name: Start Tailscale
-              if: inputs.install_tailscale
-              env:
-                  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+            - name: Remove All Browser Organization Policies
+              if: inputs.remove_browser_policies
+              shell: powershell
               run: |
-                  if [ -z "$TAILSCALE_AUTH_KEY" ]; then
-                      echo "❌ TAILSCALE_AUTH_KEY not set"
-                      exit 1
-                  fi
-                  
-                  echo "Starting Tailscale daemon..."
-                  # Force start the daemon
-                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale start &
-                  sleep 10
-                  
-                  # Wait for daemon with timeout
-                  echo "Waiting for daemon..."
-                  for i in {1..20}; do
-                      if sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status &>/dev/null; then
-                          echo "✅ Daemon ready"
-                          break
-                      fi
-                      echo "Waiting... ($i/20)"
-                      sleep 2
-                  done
-                  
-                  # Connect (with timeout)
-                  echo "Connecting to Tailscale..."
-                  timeout 60 sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --auth-key "$TAILSCALE_AUTH_KEY" || {
-                      echo "⚠️  Connection timed out, retrying..."
-                      sleep 5
-                      sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --auth-key "$TAILSCALE_AUTH_KEY"
-                  }
-                  
-                  # Show status
-                  echo "✅ Tailscale connected"
-                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status
-                  IP=$(sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4 2>/dev/null)
-                  echo "IP: $IP"
+                    # Target registry paths where "Managed by your organization" policies live
+                    $browserPolicies = @(
+                        "HKLM:\SOFTWARE\Policies\Google\Chrome",
+                        "HKCU:\SOFTWARE\Policies\Google\Chrome",
+                        "HKLM:\SOFTWARE\Policies\Microsoft\Edge",
+                        "HKCU:\SOFTWARE\Policies\Microsoft\Edge",
+                        "HKLM:\SOFTWARE\Policies\Mozilla\Firefox",
+                        "HKCU:\SOFTWARE\Policies\Mozilla\Firefox",
+                        "HKLM:\SOFTWARE\Policies\BraveSoftware\Brave",
+                        "HKCU:\SOFTWARE\Policies\BraveSoftware\Brave",
+                        "HKLM:\SOFTWARE\Policies\Vivaldi",
+                        "HKCU:\SOFTWARE\Policies\Vivaldi"
+                    )
 
-            - name: Verify Tailscale
-              if: inputs.install_tailscale
-              run: |
-                  echo "Verifying Tailscale connection..."
-                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status || echo "⚠️  Status check failed"
-                  echo "✅ Done"
+                    # Force delete the browser policy keys
+                    foreach ($path in $browserPolicies) {
+                        if (Test-Path $path) {
+                            Remove-Item -Path $path -Recurse -Force
+                            Write-Host "Successfully un-managed: $path"
+                        }
+                    }
+
+                    # Restart the Windows Explorer shell to apply registry changes immediately
+                    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+                    Write-Host "All browser enterprise configurations cleared!"
 
             - name: Install Ghostery Extension for Chrome
               if: inputs.install_ghostery
               run: |
-                    if [ -d "/Applications/Google Chrome.app" ]; then
-                        # Download Ghostery extension CRX
-                        curl -L "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc" -o /tmp/ghostery.crx
-                        echo "⚠️ Manual installation required: Open Chrome and drag ghostery.crx to chrome://extensions/"
-                    else
-                        echo "Chrome not installed, skipping Ghostery"
-                    fi
+                    try {
+                        $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                        if (Test-Path $chromePath) {
+                            # Download Ghostery extension CRX
+                            $extensionUrl = "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
+                            $crxPath = "$env:TEMP\ghostery.crx"
+                            Invoke-WebRequest -Uri $extensionUrl -OutFile $crxPath -ErrorAction Stop
 
-            - name: Set Python 3.12 as Default
-              if: inputs.set_py_default_3_12
-              run: |
-                    brew install python@3.12
-                    brew link --overwrite python@3.12
-                    echo 'export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"' >> ~/.zprofile
-                    export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"
-                    python3 --version
-                    echo "✅ Python 3.12 set as default"
+                            # Get Chrome profile path
+                            $profilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default"
 
-            - name: Enable SSH Remote Login
-              if: inputs.enable_ssh
+                            # Create extensions folder if it doesn't exist
+                            $extensionsPath = "$profilePath\Extensions\mlomiejdfkolichcflejclcbmpeaniij"
+                            New-Item -Path $extensionsPath -ItemType Directory -Force | Out-Null
+
+                            # Unzip the CRX (CRX is a zip file with a different header)
+                            # We'll use 7-Zip to extract since it's already installed
+                            $tempExtractPath = "$env:TEMP\ghostery_extract"
+                            New-Item -Path $tempExtractPath -ItemType Directory -Force | Out-Null
+
+                            # Use 7-Zip to extract
+                            $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+                            if (Test-Path $sevenZip) {
+                                & $sevenZip x $crxPath -o"$tempExtractPath" -y | Out-Null
+
+                                # Copy the extension to Chrome's extensions folder
+                                Copy-Item -Path "$tempExtractPath\*" -Destination $extensionsPath -Recurse -Force
+
+                                # Clean up
+                                Remove-Item -Path $tempExtractPath -Recurse -Force -ErrorAction SilentlyContinue
+                                Remove-Item -Path $crxPath -Force -ErrorAction SilentlyContinue
+
+                                Write-Host "✅ Ghostery extension installed"
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Host "⚠️ Could not install Ghostery extension: $_"
+                    }
+
+            - name: Install WSL
+              if: inputs.install_wsl
               run: |
-                    sudo systemsetup -setremotelogin on
-                    echo "✅ SSH Remote Login enabled"
-                    # Get current user and IP for display
-                    USERNAME=$(whoami)
-                    echo "SSH username: $USERNAME"
-                    echo "SSH access: ssh $USERNAME@[machine-ip]"
+                    dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+                    dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+                    wsl --set-default-version 2
+                    Write-Host "✅ WSL installed successfully"
+
+            - name: Install OpenSSH Server
+              run: |
+                    Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+                    Start-Service sshd
+                    Set-Service -Name sshd -StartupType 'Automatic'
+                    Write-Host "✅ OpenSSH installed and started"
+
+            - name: Configure Firewall for SSH and RDP
+              run: |
+                    # RDP Firewall Rule
+                    Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+                    # SSH Firewall Rule - Check if exists first
+                    $ruleExists = Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
+                    if (-not $ruleExists) {
+                        New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+                        Write-Host "✅ SSH firewall rule created"
+                    } else {
+                        Write-Host "✅ SSH firewall rule already exists"
+                    }
+
+                    # IIS Firewall Rule
+                    $iisRuleExists = Get-NetFirewallRule -Name "IIS-HTTP-In-TCP" -ErrorAction SilentlyContinue
+                    if (-not $iisRuleExists) {
+                        New-NetFirewallRule -Name "IIS-HTTP-In-TCP" -DisplayName "IIS HTTP" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 80
+                        Write-Host "✅ IIS HTTP firewall rule created"
+                    }
+
+                    Write-Host "✅ Firewall rules configured"
+
+            - name: Download Tailscale MSI
+              run: |
+                    Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-1.98.10-amd64.msi" -OutFile "tailscale.msi"
+
+            - name: Install Tailscale
+              run: |
+                    msiexec /i tailscale.msi /quiet /norestart
+                    Start-Sleep -Seconds 10
+                    if (Test-Path "C:\Program Files\Tailscale\tailscale.exe") {
+                        Write-Host "✅ Tailscale installed successfully"
+                    } else {
+                        Write-Host "❌ Tailscale installation failed"
+                        exit 1
+                    }
+
+            - name: Start Tailscale
+              shell: pwsh
+              env:
+                  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+              run: |
+                    $tailscaleKey = $env:TAILSCALE_AUTH_KEY
+                    if ([string]::IsNullOrEmpty($tailscaleKey)) {
+                        Write-Host "❌ TAILSCALE_AUTH_KEY environment variable is not set"
+                        exit 1
+                    }
+                    & "C:\Program Files\Tailscale\tailscale.exe" up --auth-key $tailscaleKey
+
+            - name: Enable Remote Desktop
+              run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+
+            - name: Set User Authentication
+              run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+
+            - name: Set User Password
+              env:
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+              run: |
+                    $password = $env:RDP_PASSWORD
+                    if ([string]::IsNullOrEmpty($password)) {
+                        Write-Host "❌ RDP_PASSWORD environment variable is not set"
+                        exit 1
+                    }
+                    Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText $password -Force)
 
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
               run: |
-                    # Disable sleep
-                    sudo pmset -a sleep 0
-                    sudo pmset -a disksleep 0
-                    sudo pmset -a displaysleep 0
-                    # Disable hibernation
-                    sudo pmset -a hibernatemode 0
-                    # Remove sleepimage
-                    sudo rm -f /var/vm/sleepimage
-                    echo "✅ Power settings configured: sleep disabled"
+                    # Enable Ultimate Performance power plan
+                    powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
+                    powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
 
-            - name: Configure macOS Appearance
+                    # Set monitor to never turn off
+                    powercfg -change -monitor-timeout-ac 0
+
+                    # Set disk to never turn off
+                    powercfg -change -disk-timeout-ac 0
+
+                    # Disable sleep mode
+                    powercfg -change -standby-timeout-ac 0
+                    powercfg -change -hibernate-timeout-ac 0
+
+                    # Disable hibernation completely
+                    powercfg -hibernate off
+
+                    Write-Host "✅ Ultimate Performance plan enabled, sleep/hibernation disabled"
+
+            - name: Configure Desktop Icons and Settings
+              if: inputs.configure_desktop
+              run: |
+                    # Create the registry path if it doesn't exist
+                    $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
+                    if (!(Test-Path $regPath)) {
+                        New-Item -Path $regPath -Force | Out-Null
+                    }
+
+                    # Show This PC, Control Panel, User's Files on Desktop
+                    # 0 = Show, 1 = Hide
+                    Set-ItemProperty -Path $regPath -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord  # This PC
+                    Set-ItemProperty -Path $regPath -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord  # Control Panel
+                    Set-ItemProperty -Path $regPath -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord  # User's Files
+
+                    # Also set in ClassicStartMenu for compatibility
+                    $regPathClassic = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu"
+                    if (!(Test-Path $regPathClassic)) {
+                        New-Item -Path $regPathClassic -Force | Out-Null
+                    }
+                    Set-ItemProperty -Path $regPathClassic -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord
+                    Set-ItemProperty -Path $regPathClassic -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord
+                    Set-ItemProperty -Path $regPathClassic -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord
+
+                    # Enable Auto Arrange Icons
+                    $desktopBagPath = "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop"
+                    if (!(Test-Path $desktopBagPath)) {
+                        New-Item -Path $desktopBagPath -Force | Out-Null
+                    }
+                    Set-ItemProperty -Path $desktopBagPath -Name "FFlags" -Value 1075839525 -Type DWord
+
+                    Write-Host "✅ Desktop icons configured"
+
+            - name: Disable Windows 11 Right Click Context Menu (Force Windows 10 Style)
+              if: inputs.disable_win11_context
+              run: |
+                    # Force Windows 10 style context menu
+                    reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
+                    Write-Host "✅ Windows 10 style context menu enabled"
+
+            - name: Configure Windows Appearance, Performance, and Taskbar
               if: inputs.configure_appearance
               run: |
-                    # Set dark mode
-                    defaults write NSGlobalDomain AppleInterfaceStyle -string "Dark"
-                    # Disable transparency
-                    defaults write NSGlobalDomain AppleReduceTransparency -bool true
-                    # Disable animations
-                    defaults write NSGlobalDomain NSAutomaticWindowAnimationsEnabled -bool false
-                    defaults write -g QLPanelAnimationDuration -float 0
-                    defaults write -g NSScrollAnimationEnabled -bool false
-                    defaults write -g NSWindowResizeTime -float 0.001
-                    defaults write -g NSToolbarTitleViewRolloverDelay -float 0
-                    # Hide Dock instantly
-                    defaults write com.apple.dock autohide-delay -float 0
-                    defaults write com.apple.dock autohide-time-modifier -float 0
-                    killall Dock
-                    echo "✅ macOS appearance configured"
+                    # Set Dark Theme
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
 
-            - name: Disable Telemetry and Analytics
+                    # Set Solid Black Background
+                    Set-ItemProperty -Path "HKCU:\Control Panel\Colors" -Name "Background" -Value "0 0 0"
+                    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "Wallpaper" -Value ""
+
+                    # Disable ALL Visual Effects EXCEPT Font Smoothing
+                    $newMask = [byte[]]@(0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)
+                    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $newMask
+
+                    # Disable all visual effects via System Performance Settings
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2
+
+                    # Disable specific visual effects
+                    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0"
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewAlphaSelect" -Value 0
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewShadow" -Value 0
+
+                    # Taskbar Settings - Align Left
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
+
+                    # Hide Search Box/Task View
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0
+
+                    # Disable Transparency Effects
+                    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0
+
+                    Write-Host "✅ All theme and performance settings applied"
+
+            - name: Disable Telemetry and Unnecessary Services
               if: inputs.disable_telemetry
               run: |
-                    # Disable Siri
-                    defaults write com.apple.assistant.support "Assistant Enabled" -bool false
-                    defaults write com.apple.Siri "UserHasDeclinedEnable" -bool true
-                    # Disable analytics
-                    sudo defaults write /Library/Application\ Support/CrashReporter/DiagnosticReportsEnabled -bool false
-                    defaults write com.apple.appleseed.FeedbackAssistant "AutomaticSubmit" -bool false
-                    # Disable location services
-                    sudo defaults write /var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.overridden.plist LocationServicesEnabled -bool false
-                    echo "✅ Telemetry and analytics disabled"
+                    # Disable Telemetry
+                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
+                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
 
-            - name: Install Additional Development Tools
-              run: |
-                    # Install git if not present
-                    brew install git
-                    # Install tmux for session management
-                    brew install tmux
-                    # Install htop for monitoring
-                    brew install htop
-                    # Install wget
-                    brew install wget
-                    echo "✅ Development tools installed"
+                    # Disable Unnecessary Services
+                    $services = @(
+                        "DiagTrack",
+                        "dmwappushservice",
+                        "MapsBroker",
+                        "lfsvc",
+                        "BthAvctpSvc",
+                        "Fax",
+                        "XboxNetApiSvc",
+                        "XblAuthManager",
+                        "XblGameSave",
+                        "XboxGipSvc",
+                        "wisvc",
+                        "WSearch"
+                    )
 
-            - name: Create Self-Destruct Script on Desktop
+                    foreach ($service in $services) {
+                        Stop-Service $service -ErrorAction SilentlyContinue
+                        Set-Service $service -StartupType Disabled -ErrorAction SilentlyContinue
+                    }
+
+                    Write-Host "✅ Telemetry and unnecessary services disabled"
+
+            - name: Disable Windows Search Indexing
+              if: inputs.disable_search_index
               run: |
-                    DESKTOP_PATH="$HOME/Desktop"
-                    cat > "$DESKTOP_PATH/stop-vm.sh" << 'EOF'
-                    #!/bin/bash
-                    echo "Creating stop signal and logging out of Tailscale..."
-                    sleep 2
-                    # Create stop signal file
-                    touch "$HOME/Documents/stopmachine"
-                    # Logout of Tailscale
-                    sudo tailscale logout
-                    echo "✅ Stop signal created and Tailscale logged out"
-                    echo "Machine will shut down within 3 minutes."
-                    echo "You can close this window."
-                    sleep 5
+                    # Disable Windows Search service (already disabled in previous step, but ensure it's stopped)
+                    Stop-Service "WSearch" -Force -ErrorAction SilentlyContinue
+                    Set-Service "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
+
+                    # Disable indexing via registry
+                    $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
+                    if (!(Test-Path $regPath)) {
+                        New-Item -Path $regPath -Force | Out-Null
+                    }
+
+                    Set-ItemProperty -Path $regPath -Name "DisableIndexer" -Value 1 -Type DWord -Force
+                    Set-ItemProperty -Path $regPath -Name "DisableBackoff" -Value 1 -Type DWord -Force
+                    Set-ItemProperty -Path $regPath -Name "PreventIndexingOutlook" -Value 1 -Type DWord -Force
+
+                    # Disable indexing for all drives
+                    $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 }
+                    foreach ($drive in $drives) {
+                        $driveLetter = $drive.DeviceID
+                        Write-Host "Disabling indexing on $driveLetter"
+                        & fsutil.exe behavior set disablelastaccess 1
+                        & fsutil.exe behavior set disableencryption 1
+                    }
+
+                    # Remove Search Indexer from running processes
+                    Get-Process -Name "SearchIndexer" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+                    # Delete the search index database
+                    $indexLocation = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\"
+                    if (Test-Path $indexLocation) {
+                        Remove-Item -Path $indexLocation -Recurse -Force -ErrorAction SilentlyContinue
+                    }
+
+                    Write-Host "✅ Windows Search indexing disabled"
+
+            - name: Disable OneDrive
+              if: inputs.disable_onedrive
+              run: |
+                    # Disable OneDrive via Group Policy
+                    if (!(Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive")) {
+                        New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Force
+                    }
+                    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -Type DWord
+
+                    # Stop and disable OneDrive service
+                    Stop-Process -Name OneDrive -ErrorAction SilentlyContinue
+                    Set-Service -Name OneDriveUpdaterService -StartupType Disabled -ErrorAction SilentlyContinue
+
+                    # Remove OneDrive from startup
+                    Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -ErrorAction SilentlyContinue
+
+                    Write-Host "✅ OneDrive disabled"
+
+            - name: Create Self-Destruct Batch Script on Desktop
+              run: |
+                    $batchContent = @"
+                    @echo off
+                    echo Creating stop signal and logging out of Tailscale...
+                    timeout /t 2 /nobreak >nul
+
+                    :: Create stop signal file
+                    echo. > "C:\Users\runneradmin\Documents\stopmachine"
+
+                    :: Logout of Tailscale
+                    "C:\Program Files\Tailscale\tailscale.exe" logout
+
+                    echo ✅ Stop signal created and Tailscale logged out
+                    echo Machine will shut down within 3 minutes.
+                    echo You can close this window.
+                    timeout /t 5 /nobreak >nul
                     exit
-                    EOF
-                    chmod +x "$DESKTOP_PATH/stop-vm.sh"
-                    echo "✅ Self-destruct script created at: $DESKTOP_PATH/stop-vm.sh"
+                    "@
 
-            - name: Install and Configure Screen Sharing
+                    $desktopPath = [Environment]::GetFolderPath("Desktop")
+                    $batchPath = "$desktopPath\Stop-VM.bat"
+                    $batchContent | Out-File -FilePath $batchPath -Encoding ASCII
+
+                    Write-Host "✅ Self-destruct batch script created at: $batchPath"
+                    Write-Host "   Run this script to signal the VM to shut down and logout Tailscale"
+
+            - name: Change default py launcher to 3.12
+              if: inputs.set_py_default_3_12
+              shell: pwsh
               run: |
-                    # Enable Screen Sharing
-                    sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
-                    sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
-                    echo "✅ Screen Sharing enabled"
-                    echo "  Connect via VNC: vnc://[machine-ip]"
+                $env:PY_PYTHON = "3.12"
+                [Environment]::SetEnvironmentVariable("PY_PYTHON", "3.12", "User")
+
+                $pyIniPath = "C:\Windows\py.ini"
+                $pyIniContent = @"
+                [defaults]
+                python=3.12
+                "@
+
+                if (-not (Test-Path $pyIniPath)) {
+                    New-Item -ItemType File -Path $pyIniPath -Force | Out-Null
+                }
+                Set-Content -Path $pyIniPath -Value $pyIniContent
+
+                Write-Host "Python `py` launcher default set to 3.12" -ForegroundColor Green
+                Write-Host "Restart any open terminals for changes to take effect."
+            
+            - name: Final Restart Explorer (Apply All Changes)
+              run: |
+                    # Final restart to apply all changes including theme and context menu
+                    taskkill /f /im explorer.exe
+                    Start-Process explorer.exe
+                    Start-Sleep -Seconds 3
+                    Write-Host "✅ Explorer restarted - All changes applied"
 
             - name: Session Activity Logger
+              shell: pwsh
               run: |
-                    LOG_PATH="$HOME/session_activity.log"
-                    echo "[$(date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" >> "$LOG_PATH"
-                    echo "Legitimate Use Case: ${{ inputs.legitimate_use_case }}" >> "$LOG_PATH"
-                    echo "Description: ${{ inputs.use_case_description }}" >> "$LOG_PATH"
-                    echo "✅ Session logged"
+                    # Log that the session was used for development
+                    $logPath = "C:\session_activity.log"
+
+                    # Log the start
+                    "[$(Get-Date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" | Out-File $logPath
 
             - name: Monitor Services and Keep Alive with Self-Destruct
+              shell: pwsh
               env:
-                  SSH_USER: ${{ runner.os == 'macOS' && 'runner' || 'runner' }}
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
               run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
-                    SESSION_SECONDS=21000
+                    $sessionSeconds = 21000
 
-                    # Get IP address
-                    IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+                    # Get Tailscale IP
+                    $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
+                    if (Test-Path $tailscalePath) {
+                        $ip = & $tailscalePath ip -4
+                    } else {
+                        $ip = "Tailscale not installed"
+                    }
 
-                    STOP_FILE="$HOME/Documents/stopmachine"
-                    END_TIME=$((SECONDS + SESSION_SECONDS))
-                    LAST_LOG_MINUTE=-1
+                    $password = $env:RDP_PASSWORD
+                    $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
 
-                    echo "================================================"
-                    echo " ✅ macOS Session Ready"
-                    echo " ✅ SSH Ready - $IP:22"
-                    echo " ✅ Screen Sharing - vnc://$IP"
-                    echo "======================================="
-                    echo " Username: $USER"
-                    echo " Password: Repository Secret not set"
-                    echo " "
-                    echo " Connect via SSH: ssh $USER@$IP"
-                    echo " Connect via VNC: vnc://$IP"
-                    echo " "
-                    echo "======================================="
-                    echo "  FOR GITHUB HISTORY LOGGING PURPOSES  "
-                    echo " "
-                    echo " Legitimate Use Case: ${{ inputs.legitimate_use_case }}"
-                    echo " Description: ${{ inputs.use_case_description }}"
-                    echo " "
-                    echo "======================================="
-                    echo " This session will run for 5 hrs 50 mins"
-                    echo " Run '~/Desktop/stop-vm.sh' to stop early"
-                    echo "================================================"
+                    Write-Host "================================================"
+                    Write-Host " ✅ RDP Ready - $ip`:3389"
+                    Write-Host " ✅ SSH Ready - $ip`:22"
+                    Write-Host "======================================="
+                    Write-Host " Username: runneradmin"
+                    Write-Host " Password is set in Repository Secrets"
+                    Write-Host " "
+                    Write-Host " Connect via SSH: ssh runneradmin@$ip"
+                    Write-Host " Connect via RDP: $ip`:3389"
+                    Write-Host " "
+                    Write-Host "======================================="
+                    Write-Host "  FOR GITHUB HISTORY LOGGING PURPOSES  "
+                    Write-Host " "
+                    Write-Host " Legitimate Use Case: ${{ inputs.legitimate_use_case }}"
+                    Write-Host " Description: ${{ inputs.use_case_description }}"
+                    Write-Host " "
+                    Write-Host "======================================="
+                    Write-Host " This session will run for 5 hrs 50 mins"
+                    Write-Host " Run 'Stop-VM.bat' on the desktop to stop early"
+                    Write-Host "================================================"
 
-                    while [ $SECONDS -lt $END_TIME ]; do
-                        sleep 180  # Check every 3 minutes
+                    # Run for 5 hours 50 minutes (21,000 seconds)
+                    $endTime = (Get-Date).AddSeconds($sessionSeconds)
+                    $lastLogMinute = -1
+
+                    while ((Get-Date) -lt $endTime) {
+                        Start-Sleep -Seconds 180  # Check every 3 minutes
 
                         # Check for self-destruct signal
-                        if [ -f "$STOP_FILE" ]; then
-                            echo "=========================================="
-                            echo "🛑 Self-destruct signal detected!"
-                            echo "Removing stop file..."
-                            rm -f "$STOP_FILE"
+                        if (Test-Path $stopFile) {
+                            Write-Host "=========================================="
+                            Write-Host "🛑 Self-destruct signal detected!"
+                            Write-Host "Removing stop file..."
+                            Remove-Item $stopFile -Force -ErrorAction SilentlyContinue
                             break
-                        fi
+                        }
 
                         # Log remaining time every 5 minutes
-                        REMAINING=$(((END_TIME - SECONDS) / 60))
-                        CURRENT_MINUTE=$((REMAINING / 5 * 5))
-                        if [ $CURRENT_MINUTE -ne $LAST_LOG_MINUTE ] && [ $REMAINING -gt 0 ]; then
-                            LAST_LOG_MINUTE=$CURRENT_MINUTE
-                            REMAINING_HOURS=$((REMAINING / 60))
-                            REMAINING_MINS=$((REMAINING % 60))
-                            echo "$REMAINING_HOURS hours $REMAINING_MINS minutes remaining"
-                        fi
-                    done
+                        $remaining = [math]::Round(($endTime - (Get-Date)).TotalMinutes)
+                        $currentMinute = [math]::Floor($remaining / 5) * 5
+                        if ($currentMinute -ne $lastLogMinute -and $remaining -gt 0) {
+                            $lastLogMinute = $currentMinute
+                            $remainingHours = [math]::Floor($remaining / 60)
+                            $remainingMins = [math]::Round($remaining % 60)
+                            Write-Host "$remainingHours hours $remainingMins minutes remaining"
+                        }
+                    }
 
-                    echo "=========================================="
-                    echo "Session complete - System is shutting down"
-                    echo "=========================================="
+                    Write-Host "=========================================="
+                    Write-Host "Session complete - System is shutting down"
+                    Write-Host "=========================================="
 
-            - name: Logout Tailscale (Final Cleanup with 10s Timeout)
-              if: always() && inputs.install_tailscale
+            - name: Logout Tailscale
+              if: always()
+              shell: pwsh
               run: |
-                  echo "Logging out of Tailscale..."
+                  Write-Host "Logging out of Tailscale..."
                   
                   # Try to logout with 10 second timeout
-                  timeout 10 sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale logout 2>/dev/null || {
-                      echo "Tailscale logout timed out or failed after 10 seconds"
-                      echo "Force killing Tailscale processes..."
+                  $process = Start-Process -FilePath "C:\Program Files\Tailscale\tailscale.exe" -ArgumentList "logout" -PassThru -WindowStyle Hidden
+                  
+                  # Wait up to 10 seconds for the process to exit
+                  $timeout = 10
+                  $timer = 0
+                  while (-not $process.HasExited -and $timer -lt $timeout) {
+                      Start-Sleep -Seconds 1
+                      $timer++
                   }
                   
-                  # Kill any remaining processes
-                  sudo pkill -f tailscale 2>/dev/null || true
-                  sudo pkill -f tailscaled 2>/dev/null || true
+                  if ($process.HasExited) {
+                      Write-Host "Tailscale logout completed successfully"
+                  } else {
+                      Write-Host "Tailscale logout timed out after 10 seconds."
+                  }
                   
-                  echo "Cleanup completed successfully."
+                  Write-Host "Cleanup completed successfully."
