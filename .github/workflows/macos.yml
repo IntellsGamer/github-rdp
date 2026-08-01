@@ -152,20 +152,55 @@ jobs:
             - name: Install Tailscale
               if: inputs.install_tailscale
               run: |
-                    brew install --cask tailscale
-                    echo "✅ Tailscale installed"
+                  brew install --cask tailscale
+                  echo "✅ Tailscale installed"
 
             - name: Start Tailscale
               if: inputs.install_tailscale
               env:
                   TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
               run: |
-                    if [ -z "$TAILSCALE_AUTH_KEY" ]; then
-                        echo "❌ TAILSCALE_AUTH_KEY environment variable is not set"
-                        exit 1
-                    fi
-                    sudo tailscale up --auth-key "$TAILSCALE_AUTH_KEY"
-                    echo "✅ Tailscale started"
+                  if [ -z "$TAILSCALE_AUTH_KEY" ]; then
+                      echo "❌ TAILSCALE_AUTH_KEY not set"
+                      exit 1
+                  fi
+                  
+                  echo "Starting Tailscale daemon..."
+                  # Force start the daemon
+                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale start &
+                  sleep 10
+                  
+                  # Wait for daemon with timeout
+                  echo "Waiting for daemon..."
+                  for i in {1..20}; do
+                      if sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status &>/dev/null; then
+                          echo "✅ Daemon ready"
+                          break
+                      fi
+                      echo "Waiting... ($i/20)"
+                      sleep 2
+                  done
+                  
+                  # Connect (with timeout)
+                  echo "Connecting to Tailscale..."
+                  timeout 60 sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --auth-key "$TAILSCALE_AUTH_KEY" || {
+                      echo "⚠️  Connection timed out, retrying..."
+                      sleep 5
+                      sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale up --auth-key "$TAILSCALE_AUTH_KEY"
+                  }
+                  
+                  # Show status
+                  echo "✅ Tailscale connected"
+                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status
+                  IP=$(sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4 2>/dev/null)
+                  echo "IP: $IP"
+
+            - name: Verify Tailscale
+              if: inputs.install_tailscale
+              run: |
+                  echo "Verifying Tailscale connection..."
+                  sudo /Applications/Tailscale.app/Contents/MacOS/Tailscale status || echo "⚠️  Status check failed"
+                  echo "✅ Done"
 
             - name: Install Ghostery Extension for Chrome
               if: inputs.install_ghostery
