@@ -42,7 +42,7 @@ on:
       install_sysinternals:
         description: 'Install Sysinternals Suite'
         type: boolean
-        default: true
+        default: false
       remove_browser_policies:
         description: 'Remove Browser Organization Policies'
         type: boolean
@@ -50,7 +50,7 @@ on:
       install_ghostery:
         description: 'Install Ghostery Extension for Chrome'
         type: boolean
-        default: true
+        default: false
       install_wsl:
         description: 'Install WSL'
         type: boolean
