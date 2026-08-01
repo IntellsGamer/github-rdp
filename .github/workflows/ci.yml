@@ -106,8 +106,14 @@ jobs:
         if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
         
         if ($apps.Count -gt 0) {
-          $appList = $apps -join " "
-          choco install $appList -y
+          # Install each package individually
+          foreach ($app in $apps) {
+            Write-Host "Installing $app..."
+            choco install $app -y
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "⚠️ Failed to install $app"
+            }
+          }
           Start-Sleep -Seconds 5
           
           # Pin Chrome to taskbar if installed
