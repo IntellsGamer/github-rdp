@@ -43,6 +43,10 @@ on:
                 description: "Install OpenCode AI Agent"
                 type: boolean
                 default: true
+            install_kilocli:
+                description: "Install Kilo CLI"
+                type: boolean
+                default: true
             install_sysinternals:
                 description: "Install Sysinternals Suite"
                 type: boolean
@@ -164,6 +168,12 @@ jobs:
               run: |
                     npm i -g opencode-ai
                     Write-Host "✅ OpenCode installed"
+
+            - name: Install Kilo CLI
+              if: inputs.install_kilocli
+              run: |
+                    npm install -g @kilocode/cli
+                    Write-Host "✅ Kilo CLI installed"
             
             - name: Install Sysinternals Suite
               if: inputs.install_sysinternals
