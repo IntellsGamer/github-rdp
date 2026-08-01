@@ -125,6 +125,18 @@ Connect via:
 
 [![Install on Chrome Web Store](https://img.shields.io/badge/Install%20on-Chrome%20Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/ghostery-adblocker-for-pr/mlomiejdfkolichcflejclcbmpeaniij)
 
+---
+
+## GitHub's Perspective
+
+We understand this tool operates in a sensitive area. Here's how we address concerns:
+
+| Concern | Our Response |
+|---------|--------------|
+| **Resource abuse** | Sessions are limited to 6 hours and require explicit use case selection |
+| **ToS violation** | We only use runners for their intended purpose: debugging and testing software |
+| **Account risk** | We strongly advise against overuse and recommend using sparingly |
+
 
 ---
 
