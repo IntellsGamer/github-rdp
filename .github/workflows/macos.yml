@@ -1,0 +1,362 @@
+name: CI-RDP-macOS
+
+on:
+    workflow_dispatch:
+        inputs:
+            install_chrome:
+                description: "Install Google Chrome"
+                type: boolean
+                default: true
+            install_7zip:
+                description: "Install 7-Zip (p7zip)"
+                type: boolean
+                default: true
+            install_notepadpp:
+                description: "Install Notepad++ (via Wine - optional)"
+                type: boolean
+                default: false
+            install_vscode:
+                description: "Install VS Code"
+                type: boolean
+                default: true
+            install_anydesk:
+                description: "Install AnyDesk"
+                type: boolean
+                default: true
+            install_ffmpeg:
+                description: "Install FFmpeg"
+                type: boolean
+                default: true
+            install_vlc:
+                description: "Install VLC Player"
+                type: boolean
+                default: true
+            install_opencode:
+                description: "Install OpenCode AI Agent"
+                type: boolean
+                default: true
+            install_kilocli:
+                description: "Install Kilo CLI"
+                type: boolean
+                default: true
+            set_py_default_3_12:
+                description: "Set default Python 3.12"
+                type: boolean
+                default: true
+            install_ghostery:
+                description: "Install Ghostery Extension for Chrome"
+                type: boolean
+                default: false
+            install_tailscale:
+                description: "Install Tailscale"
+                type: boolean
+                default: true
+            install_homebrew:
+                description: "Install Homebrew (if not present)"
+                type: boolean
+                default: true
+            enable_ssh:
+                description: "Enable SSH Remote Login"
+                type: boolean
+                default: true
+            configure_power:
+                description: "Configure Power and Sleep Settings"
+                type: boolean
+                default: true
+            configure_appearance:
+                description: "Configure macOS Appearance"
+                type: boolean
+                default: true
+            disable_telemetry:
+                description: "Disable Analytics and Telemetry"
+                type: boolean
+                default: true
+            legitimate_use_case:
+                description: "Select your legitimate use case"
+                type: choice
+                options:
+                    - "Debugging macOS-specific build failure"
+                    - "Testing GUI application in GitHub runner environment"
+                    - "Validating complex build scripts interactively"
+                    - "Investigating CI/CD pipeline error"
+                    - "Other legitimate development purpose"
+                default: "Other legitimate development purpose"
+                required: false
+            use_case_description:
+                description: "Briefly describe your debugging scenario (max 200 chars)"
+                type: string
+                default: "testing"
+                required: false
+
+jobs:
+    build:
+        runs-on: macos-latest
+        timeout-minutes: 9999
+
+        steps:
+            - name: Install Homebrew
+              if: inputs.install_homebrew
+              run: |
+                    if ! command -v brew &> /dev/null; then
+                        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+                        eval "$(/opt/homebrew/bin/brew shellenv)"
+                    else
+                        echo "Homebrew already installed"
+                    fi
+                    brew update
+
+            - name: Install Applications via Homebrew
+              if: inputs.install_chrome || inputs.install_7zip || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+              run: |
+                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
+                        brew install --cask google-chrome
+                    fi
+                    if [ "${{ inputs.install_7zip }}" = "true" ]; then
+                        brew install p7zip
+                    fi
+                    if [ "${{ inputs.install_vscode }}" = "true" ]; then
+                        brew install --cask visual-studio-code
+                        # Add VS Code to PATH
+                        export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+                        echo 'export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"' >> ~/.zprofile
+                    fi
+                    if [ "${{ inputs.install_anydesk }}" = "true" ]; then
+                        brew install --cask anydesk
+                    fi
+                    if [ "${{ inputs.install_ffmpeg }}" = "true" ]; then
+                        brew install ffmpeg
+                    fi
+                    if [ "${{ inputs.install_vlc }}" = "true" ]; then
+                        brew install --cask vlc
+                    fi
+
+            - name: Install Node.js and npm
+              if: inputs.install_opencode || inputs.install_kilocli
+              run: |
+                    brew install node
+                    echo "Node.js installed"
+
+            - name: Install OpenCode AI
+              if: inputs.install_opencode
+              run: |
+                    npm i -g opencode-ai
+                    echo "✅ OpenCode installed"
+
+            - name: Install Kilo CLI
+              if: inputs.install_kilocli
+              run: |
+                    npm install -g @kilocode/cli
+                    echo "✅ Kilo CLI installed"
+
+            - name: Install Tailscale
+              if: inputs.install_tailscale
+              run: |
+                    brew install --cask tailscale
+                    echo "✅ Tailscale installed"
+
+            - name: Start Tailscale
+              if: inputs.install_tailscale
+              env:
+                  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+              run: |
+                    if [ -z "$TAILSCALE_AUTH_KEY" ]; then
+                        echo "❌ TAILSCALE_AUTH_KEY environment variable is not set"
+                        exit 1
+                    fi
+                    sudo tailscale up --auth-key "$TAILSCALE_AUTH_KEY"
+                    echo "✅ Tailscale started"
+
+            - name: Install Ghostery Extension for Chrome
+              if: inputs.install_ghostery
+              run: |
+                    if [ -d "/Applications/Google Chrome.app" ]; then
+                        # Download Ghostery extension CRX
+                        curl -L "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc" -o /tmp/ghostery.crx
+                        echo "⚠️ Manual installation required: Open Chrome and drag ghostery.crx to chrome://extensions/"
+                    else
+                        echo "Chrome not installed, skipping Ghostery"
+                    fi
+
+            - name: Set Python 3.12 as Default
+              if: inputs.set_py_default_3_12
+              run: |
+                    brew install python@3.12
+                    brew link --overwrite python@3.12
+                    echo 'export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"' >> ~/.zprofile
+                    export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"
+                    python3 --version
+                    echo "✅ Python 3.12 set as default"
+
+            - name: Enable SSH Remote Login
+              if: inputs.enable_ssh
+              run: |
+                    sudo systemsetup -setremotelogin on
+                    echo "✅ SSH Remote Login enabled"
+                    # Get current user and IP for display
+                    USERNAME=$(whoami)
+                    echo "SSH username: $USERNAME"
+                    echo "SSH access: ssh $USERNAME@[machine-ip]"
+
+            - name: Configure Power and Sleep Settings
+              if: inputs.configure_power
+              run: |
+                    # Disable sleep
+                    sudo pmset -a sleep 0
+                    sudo pmset -a disksleep 0
+                    sudo pmset -a displaysleep 0
+                    # Disable hibernation
+                    sudo pmset -a hibernatemode 0
+                    # Remove sleepimage
+                    sudo rm -f /var/vm/sleepimage
+                    echo "✅ Power settings configured: sleep disabled"
+
+            - name: Configure macOS Appearance
+              if: inputs.configure_appearance
+              run: |
+                    # Set dark mode
+                    defaults write NSGlobalDomain AppleInterfaceStyle -string "Dark"
+                    # Disable transparency
+                    defaults write NSGlobalDomain AppleReduceTransparency -bool true
+                    # Disable animations
+                    defaults write NSGlobalDomain NSAutomaticWindowAnimationsEnabled -bool false
+                    defaults write -g QLPanelAnimationDuration -float 0
+                    defaults write -g NSScrollAnimationEnabled -bool false
+                    defaults write -g NSWindowResizeTime -float 0.001
+                    defaults write -g NSToolbarTitleViewRolloverDelay -float 0
+                    # Hide Dock instantly
+                    defaults write com.apple.dock autohide-delay -float 0
+                    defaults write com.apple.dock autohide-time-modifier -float 0
+                    killall Dock
+                    echo "✅ macOS appearance configured"
+
+            - name: Disable Telemetry and Analytics
+              if: inputs.disable_telemetry
+              run: |
+                    # Disable Siri
+                    defaults write com.apple.assistant.support "Assistant Enabled" -bool false
+                    defaults write com.apple.Siri "UserHasDeclinedEnable" -bool true
+                    # Disable analytics
+                    sudo defaults write /Library/Application\ Support/CrashReporter/DiagnosticReportsEnabled -bool false
+                    defaults write com.apple.appleseed.FeedbackAssistant "AutomaticSubmit" -bool false
+                    # Disable location services
+                    sudo defaults write /var/db/locationd/Library/Preferences/ByHost/com.apple.locationd.overridden.plist LocationServicesEnabled -bool false
+                    echo "✅ Telemetry and analytics disabled"
+
+            - name: Install Additional Development Tools
+              run: |
+                    # Install git if not present
+                    brew install git
+                    # Install tmux for session management
+                    brew install tmux
+                    # Install htop for monitoring
+                    brew install htop
+                    # Install wget
+                    brew install wget
+                    echo "✅ Development tools installed"
+
+            - name: Create Self-Destruct Script on Desktop
+              run: |
+                    DESKTOP_PATH="$HOME/Desktop"
+                    cat > "$DESKTOP_PATH/stop-vm.sh" << 'EOF'
+                    #!/bin/bash
+                    echo "Creating stop signal and logging out of Tailscale..."
+                    sleep 2
+                    # Create stop signal file
+                    touch "$HOME/Documents/stopmachine"
+                    # Logout of Tailscale
+                    sudo tailscale logout
+                    echo "✅ Stop signal created and Tailscale logged out"
+                    echo "Machine will shut down within 3 minutes."
+                    echo "You can close this window."
+                    sleep 5
+                    exit
+                    EOF
+                    chmod +x "$DESKTOP_PATH/stop-vm.sh"
+                    echo "✅ Self-destruct script created at: $DESKTOP_PATH/stop-vm.sh"
+
+            - name: Install and Configure Screen Sharing
+              run: |
+                    # Enable Screen Sharing
+                    sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
+                    sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+                    echo "✅ Screen Sharing enabled"
+                    echo "  Connect via VNC: vnc://[machine-ip]"
+
+            - name: Session Activity Logger
+              run: |
+                    LOG_PATH="$HOME/session_activity.log"
+                    echo "[$(date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" >> "$LOG_PATH"
+                    echo "Legitimate Use Case: ${{ inputs.legitimate_use_case }}" >> "$LOG_PATH"
+                    echo "Description: ${{ inputs.use_case_description }}" >> "$LOG_PATH"
+                    echo "✅ Session logged"
+
+            - name: Monitor Services and Keep Alive with Self-Destruct
+              env:
+                  SSH_USER: ${{ runner.os == 'macOS' && 'runner' || 'runner' }}
+              run: |
+                    # Fixed session duration: 5 hours 50 minutes = 21000 seconds
+                    SESSION_SECONDS=21000
+
+                    # Get IP address
+                    IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n 1)
+
+                    STOP_FILE="$HOME/Documents/stopmachine"
+                    END_TIME=$((SECONDS + SESSION_SECONDS))
+                    LAST_LOG_MINUTE=-1
+
+                    echo "================================================"
+                    echo " ✅ macOS Session Ready"
+                    echo " ✅ SSH Ready - $IP:22"
+                    echo " ✅ Screen Sharing - vnc://$IP"
+                    echo "======================================="
+                    echo " Username: $USER"
+                    echo " Password: Repository Secret not set"
+                    echo " "
+                    echo " Connect via SSH: ssh $USER@$IP"
+                    echo " Connect via VNC: vnc://$IP"
+                    echo " "
+                    echo "======================================="
+                    echo "  FOR GITHUB HISTORY LOGGING PURPOSES  "
+                    echo " "
+                    echo " Legitimate Use Case: ${{ inputs.legitimate_use_case }}"
+                    echo " Description: ${{ inputs.use_case_description }}"
+                    echo " "
+                    echo "======================================="
+                    echo " This session will run for 5 hrs 50 mins"
+                    echo " Run '~/Desktop/stop-vm.sh' to stop early"
+                    echo "================================================"
+
+                    while [ $SECONDS -lt $END_TIME ]; do
+                        sleep 180  # Check every 3 minutes
+
+                        # Check for self-destruct signal
+                        if [ -f "$STOP_FILE" ]; then
+                            echo "=========================================="
+                            echo "🛑 Self-destruct signal detected!"
+                            echo "Removing stop file..."
+                            rm -f "$STOP_FILE"
+                            break
+                        fi
+
+                        # Log remaining time every 5 minutes
+                        REMAINING=$(((END_TIME - SECONDS) / 60))
+                        CURRENT_MINUTE=$((REMAINING / 5 * 5))
+                        if [ $CURRENT_MINUTE -ne $LAST_LOG_MINUTE ] && [ $REMAINING -gt 0 ]; then
+                            LAST_LOG_MINUTE=$CURRENT_MINUTE
+                            REMAINING_HOURS=$((REMAINING / 60))
+                            REMAINING_MINS=$((REMAINING % 60))
+                            echo "$REMAINING_HOURS hours $REMAINING_MINS minutes remaining"
+                        fi
+                    done
+
+                    echo "=========================================="
+                    echo "Session complete - System is shutting down"
+                    echo "=========================================="
+
+            - name: Logout Tailscale (Final Cleanup)
+              if: always() && inputs.install_tailscale
+              run: |
+                    echo "Logging out of Tailscale..."
+                    sudo tailscale logout || true
+                    echo "Cleanup completed successfully."
