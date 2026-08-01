@@ -525,6 +525,7 @@ jobs:
                     $batchContent = @"
                     @echo off
                     echo Creating stop signal and logging out of Tailscale...
+                    timeout /t 5 /nobreak >nul
 
                     :: Create stop signal file
                     echo. > "C:\Users\runneradmin\Documents\stopmachine"
