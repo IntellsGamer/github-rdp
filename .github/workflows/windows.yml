@@ -599,99 +599,94 @@ jobs:
                         Write-Host "⚠️ SHUTDOWN_PASSWORD not set - listener will still run but password validation disabled"
                     }
 
-                    $listenerScript = @"
-                    # TCP listener on port 2266 with password validation
-                    `$password = "$password"
-                    `$stopFile = "C:\Users\runneradmin\Documents\stopmachine"
-                    `$listenerPort = 2266
+                    $listenerScript = @'
+                    $password = "$env:SHUTDOWN_PASSWORD"
+                    $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
+                    $listenerPort = 2266
                     
-                    # Create TCP listener
-                    `$listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, `$listenerPort)
-                    `$listener.Start()
+                    $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $listenerPort)
+                    $listener.Start()
                     
                     Write-Host "================================================"
                     Write-Host "🔒 Password-protected shutdown listener running"
-                    Write-Host "   Port: `$listenerPort"
-                    if (-not [string]::IsNullOrEmpty(`$password)) {
+                    Write-Host "   Port: $listenerPort"
+                    if (-not [string]::IsNullOrEmpty($password)) {
                         Write-Host "   Password: (set in secrets)"
                     } else {
                         Write-Host "   ⚠️  Password not set - any connection will trigger shutdown"
                     }
                     Write-Host "================================================"
                     Write-Host "To shutdown VM:"
-                    Write-Host "  nc <ip> `$listenerPort"
+                    Write-Host "  nc <ip> $listenerPort"
                     Write-Host "  Then type password and press Enter"
                     Write-Host "================================================"
                     
-                    while (`$true) {
+                    while ($true) {
                         try {
-                            # Accept client connection
-                            `$client = `$listener.AcceptTcpClient()
-                            `$stream = `$client.GetStream()
-                            `$reader = New-Object System.IO.StreamReader(`$stream)
-                            `$writer = New-Object System.IO.StreamWriter(`$stream)
-                            `$writer.AutoFlush = `$true
+                            $client = $listener.AcceptTcpClient()
+                            $stream = $client.GetStream()
+                            $reader = New-Object System.IO.StreamReader($stream)
+                            $writer = New-Object System.IO.StreamWriter($stream)
+                            $writer.AutoFlush = $true
                             
-                            # Send password prompt
-                            `$writer.WriteLine("Password: ")
+                            $writer.WriteLine("Password: ")
                             
-                            # Read password from client with timeout
-                            `$readTask = `$reader.ReadLineAsync()
-                            if (`$readTask.Wait(5000)) {
-                                `$inputPassword = `$readTask.Result
+                            $readTask = $reader.ReadLineAsync()
+                            if ($readTask.Wait(5000)) {
+                                $inputPassword = $readTask.Result
                                 
-                                # Validate password
-                                `$valid = `$false
-                                if (-not [string]::IsNullOrEmpty(`$password)) {
-                                    if (`$inputPassword -eq `$password) {
-                                        `$valid = `$true
+                                $valid = $false
+                                if (-not [string]::IsNullOrEmpty($password)) {
+                                    if ($inputPassword -eq $password) {
+                                        $valid = $true
                                     }
                                 } else {
-                                    # If no password set, accept any input
-                                    `$valid = `$true
+                                    $valid = $true
                                 }
                                 
-                                if (`$valid) {
-                                    `$writer.WriteLine("✅ Password validated. Creating shutdown signal...")
+                                if ($valid) {
+                                    $writer.WriteLine("✅ Password validated. Creating shutdown signal...")
                                     
-                                    # Create stop signal
-                                    if (-not (Test-Path `$stopFile)) {
-                                        New-Item -Path `$stopFile -ItemType File -Force | Out-Null
+                                    if (-not (Test-Path $stopFile)) {
+                                        New-Item -Path $stopFile -ItemType File -Force | Out-Null
                                     }
-                                    `$writer.WriteLine("✅ Shutdown signal created. VM will shut down within 3 minutes.")
-                                    Write-Host "[`$(Get-Date)] Shutdown triggered via listener from `$($client.Client.RemoteEndPoint.Address)"
+                                    $writer.WriteLine("✅ Shutdown signal created. VM will shut down within 3 minutes.")
+                                    Write-Host "[$(Get-Date)] Shutdown triggered via listener from $($client.Client.RemoteEndPoint.Address)"
                                 } else {
-                                    `$writer.WriteLine("❌ Invalid password. Connection rejected.")
-                                    Write-Host "[`$(Get-Date)] Failed login attempt from `$($client.Client.RemoteEndPoint.Address)"
+                                    $writer.WriteLine("❌ Invalid password. Connection rejected.")
+                                    Write-Host "[$(Get-Date)] Failed login attempt from $($client.Client.RemoteEndPoint.Address)"
                                 }
                             } else {
-                                `$writer.WriteLine("❌ Connection timed out. Please try again.")
+                                $writer.WriteLine("❌ Connection timed out. Please try again.")
                             }
                         } catch {
-                            Write-Host "[`$(Get-Date)] Listener error: `$_"
+                            Write-Host "[$(Get-Date)] Listener error: $_"
                         } finally {
-                            if (`$client -ne `$null) {
-                                `$client.Close()
+                            if ($client -ne $null) {
+                                $client.Close()
                             }
                         }
                     }
-                    
-                    # Note: This script runs forever, but the main loop will handle shutdown
-                    "# @listenerScript
+                    '@
 
-                    # Save the listener script
+                    # Save the listener script with environment variable
                     $listenerPath = "C:\shutdown_listener.ps1"
                     $listenerScript | Out-File -FilePath $listenerPath -Encoding ASCII
 
                     # Add firewall rule for port 2266
-                    New-NetFirewallRule -DisplayName "Shutdown Listener" -Direction Inbound -Protocol TCP -LocalPort 2266 -Action Allow
+                    New-NetFirewallRule -DisplayName "Shutdown Listener" -Direction Inbound -Protocol TCP -LocalPort 2266 -Action Allow -ErrorAction SilentlyContinue
 
-                    # Start the listener in a background process
-                    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$listenerPath`"" -WindowStyle Hidden
+                    # Start the listener with the password as an environment variable
+                    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+                    $startInfo.FileName = "powershell.exe"
+                    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$listenerPath`""
+                    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+                    $startInfo.EnvironmentVariables["SHUTDOWN_PASSWORD"] = $password
+                    [System.Diagnostics.Process]::Start($startInfo)
 
                     Write-Host "✅ Shutdown listener started on port 2266"
                     Write-Host "   Connect with: nc <ip> 2266"
-                    if (-not [string]::IsNullOrEmpty($env:SHUTDOWN_PASSWORD)) {
+                    if (-not [string]::IsNullOrEmpty($password)) {
                         Write-Host "   Password is set in repository secrets"
                     } else {
                         Write-Host "   ⚠️  WARNING: No password set - anyone can shutdown!"
