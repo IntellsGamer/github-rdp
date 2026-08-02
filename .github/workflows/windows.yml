@@ -456,17 +456,21 @@ jobs:
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
               run: |
-                    # Store RDP password for shutdown service
+                    # Store RDP password for shutdown service (cleanly)
                     $password = $env:RDP_PASSWORD
-                    $password | Out-File -FilePath "C:\web-services\shutdownpassword.txt" -Encoding ASCII
+                    # Remove any trailing whitespace or newlines
+                    $password = $password.Trim()
+                    $password | Out-File -FilePath "C:\web-services\shutdownpassword.txt" -Encoding ASCII -NoNewline
 
                     # Create PowerShell script for netcat shutdown server
                     $ncScript = @'
                     param($Port = 2266, $PasswordFile = "C:\web-services\shutdownpassword.txt")
                     
-                    # Read shutdown password
-                    $shutdownPass = Get-Content -Path $PasswordFile -Raw
+                    # Read shutdown password and clean it
+                    $shutdownPass = (Get-Content -Path $PasswordFile -Raw).Trim()
+                    
                     Write-Host "Shutdown server running on port $Port"
+                    Write-Host "Password loaded (length: $($shutdownPass.Length))"
                     
                     # Create listener
                     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $Port)
@@ -484,8 +488,14 @@ jobs:
                             $writer.WriteLine("Enter shutdown password:")
                             $writer.Flush()
                             
-                            # Read password attempt
+                            # Read password attempt and clean it
                             $attempt = $reader.ReadLine()
+                            if ($attempt) {
+                                $attempt = $attempt.Trim()
+                            }
+                            
+                            Write-Host "Password attempt received (length: $($attempt.Length))"
+                            Write-Host "Expected password length: $($shutdownPass.Length)"
                             
                             if ($attempt -eq $shutdownPass) {
                                 $writer.WriteLine("Password correct! Shutting down...")
@@ -497,9 +507,11 @@ jobs:
                                 
                                 $writer.WriteLine("Shutdown initiated!")
                                 $writer.Flush()
+                                Write-Host "✅ Shutdown triggered successfully!"
                             } else {
                                 $writer.WriteLine("Invalid password! Connection closed.")
                                 $writer.Flush()
+                                Write-Host "❌ Invalid password attempt"
                             }
                             
                             $client.Close()
