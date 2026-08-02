@@ -310,7 +310,7 @@ jobs:
                     $password | Out-File -FilePath "C:\web-services\sshpassword.txt" -Encoding ASCII -NoNewline
                     $password | Out-File -FilePath "C:\web-services\shutdownpassword.txt" -Encoding ASCII -NoNewline
 
-                    # Create password-protected noVNC HTML
+                    # Create password-protected noVNC HTML - Password checked server-side
                     $novncHtml = @"
                     <!DOCTYPE html>
                     <html>
@@ -324,6 +324,7 @@ jobs:
                             button:hover { background: #c73e54; }
                             #vncContainer { width: 100vw; height: 100vh; display: none; }
                             h2 { text-align: center; }
+                            .error { color: #ff6b6b; text-align: center; margin-top: 10px; }
                         </style>
                     </head>
                     <body>
@@ -332,57 +333,37 @@ jobs:
                             <p>Enter password to access VNC</p>
                             <input type="password" id="password" placeholder="Enter password" />
                             <button onclick="authenticate()">Connect</button>
+                            <div id="errorMsg" class="error"></div>
                         </div>
                         <div id="vncContainer"></div>
                         <script>
-                            var correctPassword = '$password';
-                            
                             function authenticate() {
                                 var password = document.getElementById('password').value;
-                                if (password === correctPassword) {
-                                    document.getElementById('authForm').style.display = 'none';
-                                    document.getElementById('vncContainer').style.display = 'block';
-                                    loadVNC();
-                                } else {
-                                    alert('Invalid password!');
-                                }
+                                var xhr = new XMLHttpRequest();
+                                xhr.open('POST', '/auth', true);
+                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                xhr.onreadystatechange = function() {
+                                    if (xhr.readyState === 4) {
+                                        if (xhr.status === 200) {
+                                            document.getElementById('authForm').style.display = 'none';
+                                            document.getElementById('vncContainer').style.display = 'block';
+                                            loadVNC();
+                                        } else {
+                                            document.getElementById('errorMsg').innerHTML = 'Invalid password!';
+                                        }
+                                    }
+                                };
+                                xhr.send('password=' + encodeURIComponent(password));
                             }
                             
                             function loadVNC() {
-                                var script = document.createElement('script');
-                                script.src = 'app/ui.js';
-                                script.onload = function() {
-                                    var host = window.location.hostname;
-                                    var port = 6080;
-                                    var path = 'websockify';
-                                    
-                                    var UI = new RFB(document.getElementById('vncContainer'), 
-                                        'ws://' + host + ':' + port + '/' + path,
-                                        {
-                                            credentials: {
-                                                password: '$password'
-                                            }
-                                        }
-                                    );
-                                    
-                                    UI.addEventListener('connect', function() {
-                                        console.log('Connected to VNC server');
-                                    });
-                                    
-                                    UI.addEventListener('disconnect', function(e) {
-                                        console.log('Disconnected: ' + e.detail.reason);
-                                    });
-                                    
-                                    UI.addEventListener('error', function(e) {
-                                        console.error('Error: ' + e.detail.reason);
-                                    });
-                                };
-                                document.body.appendChild(script);
-                                
-                                var css = document.createElement('link');
-                                css.rel = 'stylesheet';
-                                css.href = 'app/styles/base.css';
-                                document.head.appendChild(css);
+                                // Load noVNC via iframe to avoid import issues
+                                var iframe = document.createElement('iframe');
+                                iframe.src = '/vnc.html';
+                                iframe.style.width = '100%';
+                                iframe.style.height = '100%';
+                                iframe.style.border = 'none';
+                                document.getElementById('vncContainer').appendChild(iframe);
                             }
                             
                             document.getElementById('password').addEventListener('keydown', function(e) {
@@ -414,6 +395,7 @@ jobs:
                             button:hover { background: #c73e54; }
                             h2 { text-align: center; }
                             #terminal { height: 90vh; }
+                            .error { color: #ff6b6b; text-align: center; margin-top: 10px; }
                         </style>
                     </head>
                     <body>
@@ -422,6 +404,7 @@ jobs:
                             <p>Enter password to access SSH</p>
                             <input type="password" id="sshPassword" placeholder="Enter password" />
                             <button onclick="authenticateSSH()">Connect to SSH</button>
+                            <div id="errorMsg" class="error"></div>
                         </div>
                         <div id="terminalContainer">
                             <div id="terminal"></div>
@@ -430,17 +413,22 @@ jobs:
                             function authenticateSSH() {
                                 var password = document.getElementById('sshPassword').value;
                                 var xhr = new XMLHttpRequest();
-                                xhr.open('POST', '/sshauth', false);
+                                xhr.open('POST', '/sshauth', true);
                                 xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                xhr.onreadystatechange = function() {
+                                    if (xhr.readyState === 4) {
+                                        if (xhr.status === 200) {
+                                            document.getElementById('authForm').style.display = 'none';
+                                            document.getElementById('terminalContainer').style.display = 'block';
+                                            connectSSH();
+                                        } else {
+                                            document.getElementById('errorMsg').innerHTML = 'Invalid password!';
+                                        }
+                                    }
+                                };
                                 xhr.send('password=' + encodeURIComponent(password));
-                                if (xhr.status === 200) {
-                                    document.getElementById('authForm').style.display = 'none';
-                                    document.getElementById('terminalContainer').style.display = 'block';
-                                    connectSSH();
-                                } else {
-                                    alert('Invalid password!');
-                                }
                             }
+                            
                             function connectSSH() {
                                 const term = new Terminal();
                                 const fitAddon = new FitAddon.FitAddon();
@@ -451,7 +439,7 @@ jobs:
                                 term.writeln('Type your SSH commands below...');
                                 term.writeln('Example: ssh runneradmin@localhost');
                                 
-                                const ws = new WebSocket('ws://' + window.location.hostname + ':8080/ssh');
+                                const ws = new WebSocket('ws://' + window.location.hostname + ':8081');
                                 ws.onopen = function() {
                                     term.writeln('\x1b[1;32mWebSocket connected!\x1b[0m');
                                 };
@@ -469,6 +457,12 @@ jobs:
                                     ws.send(data);
                                 });
                             }
+                            
+                            document.getElementById('sshPassword').addEventListener('keydown', function(e) {
+                                if (e.key === 'Enter') {
+                                    authenticateSSH();
+                                }
+                            });
                         </script>
                     </body>
                     </html>
@@ -540,15 +534,17 @@ jobs:
                     const password = fs.readFileSync('C:\\web-services\\password.txt', 'utf8').trim();
                     const webDir = 'C:\\web-services\\novnc';
                     
-                    exec('python -m websockify --web=C:\\web-services\\novnc 6080 localhost:5900', (error, stdout, stderr) => {
+                    // Start websockify
+                    exec('python -m websockify --web=' + webDir + ' 6081 localhost:5900', (error, stdout, stderr) => {
                         if (error) {
                             console.error(`websockify error: ${error}`);
                             return;
                         }
-                        console.log(`websockify output: ${stdout}`);
+                        console.log(`websockify started on port 6081`);
                     });
                     
                     const server = http.createServer((req, res) => {
+                        // Handle authentication
                         if (req.url === '/auth' && req.method === 'POST') {
                             let body = '';
                             req.on('data', chunk => body += chunk);
@@ -565,6 +561,7 @@ jobs:
                             return;
                         }
                         
+                        // Serve the index.html (our password page) for root
                         if (req.url === '/') {
                             fs.readFile('C:\\web-services\\index.html', (err, data) => {
                                 if (err) {
@@ -578,6 +575,23 @@ jobs:
                             return;
                         }
                         
+                        // Serve noVNC files - rewrite vnc.html to use correct websocket port
+                        if (req.url === '/vnc.html') {
+                            fs.readFile(path.join(webDir, 'vnc.html'), 'utf8', (err, data) => {
+                                if (err) {
+                                    res.writeHead(404);
+                                    res.end('File not found');
+                                    return;
+                                }
+                                // Replace the default websocket port with our websockify port
+                                var modified = data.replace(/var port.*?;/g, 'var port = 6081;');
+                                res.writeHead(200, { 'Content-Type': 'text/html' });
+                                res.end(modified);
+                            });
+                            return;
+                        }
+                        
+                        // Serve other noVNC files
                         let filePath = path.join(webDir, req.url);
                         if (!filePath.startsWith(webDir)) {
                             res.writeHead(403);
