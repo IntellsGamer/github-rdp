@@ -631,6 +631,12 @@ jobs:
                                 $writer.WriteLine("Password correct! Shutting down...")
                                 $writer.Flush()
                                 
+                                # Send final message and disconnect
+                                $writer.WriteLine("Shutdown initiated! Disconnecting...")
+                                $writer.Flush()
+                                Start-Sleep -Milliseconds 500
+                                $client.Close()
+                                
                                 # Create stop signal file
                                 [System.IO.File]::WriteAllText("C:\Users\runneradmin\Documents\stopmachine", "")
                                 
@@ -645,19 +651,13 @@ jobs:
                                     Write-Host "⚠️ Failed to logout Tailscale: $_"
                                 }
                                 
-                                # Send final message and close connection
-                                $writer.WriteLine("Shutdown initiated! Disconnecting...")
-                                $writer.Flush()
-                                Start-Sleep -Milliseconds 500
-                                
                                 Write-Host "✅ Shutdown triggered successfully!"
                             } else {
                                 $writer.WriteLine("Invalid password! Connection closed.")
                                 $writer.Flush()
+                                $client.Close()
                                 Write-Host "❌ Invalid password attempt"
                             }
-                            
-                            $client.Close()
                         } catch {
                             Write-Host "Error: $_"
                         }
