@@ -512,19 +512,162 @@ jobs:
 
                     Write-Host "✅ Netcat shutdown server created on port 2266"
 
+            - name: Install noVNC and WebSSH2 with Authentication
+              env:
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+              run: |
+                    # Install Node.js dependencies
+                    npm install -g http-server websockify ws
+
+                    # Create directory for web services
+                    mkdir C:\web-services
+                    cd C:\web-services
+
+                    # Download noVNC
+                    Invoke-WebRequest -Uri "https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.zip" -OutFile "novnc.zip"
+                    Expand-Archive -Path "novnc.zip" -DestinationPath "."
+                    Move-Item -Path ".\noVNC-1.4.0\*" -Destination ".\novnc" -Force
+                    Remove-Item -Path ".\noVNC-1.4.0" -Recurse -Force
+                    Remove-Item -Path ".\novnc.zip" -Force
+
+                    # Download websockify for noVNC
+                    Invoke-WebRequest -Uri "https://github.com/novnc/websockify/archive/refs/tags/v0.12.0.zip" -OutFile "websockify.zip"
+                    Expand-Archive -Path "websockify.zip" -DestinationPath "."
+                    Move-Item -Path ".\websockify-0.12.0\*" -Destination ".\websockify" -Force
+                    Remove-Item -Path ".\websockify-0.12.0" -Recurse -Force
+                    Remove-Item -Path ".\websockify.zip" -Force
+
+                    # Store RDP password for services (masked from logs)
+                    $password = $env:RDP_PASSWORD
+                    $password | Out-File -FilePath "C:\web-services\password.txt" -Encoding ASCII
+
+                    # Create password-protected noVNC HTML with correct WebSocket path
+                    $novncHtml = @"
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>noVNC with Authentication</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #eee; }
+                            #authForm { max-width: 400px; margin: 100px auto; padding: 30px; background: #16213e; border-radius: 10px; }
+                            input { width: 100%; padding: 10px; margin: 10px 0; background: #0f3460; color: #eee; border: none; border-radius: 5px; }
+                            button { width: 100%; padding: 10px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                            button:hover { background: #c73e54; }
+                            #vncContainer { width: 100vw; height: 100vh; display: none; }
+                            h2 { text-align: center; }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="authForm">
+                            <h2>🔐 Authentication Required</h2>
+                            <p>Enter password to access VNC</p>
+                            <input type="password" id="password" placeholder="Enter password" />
+                            <button onclick="authenticate()">Connect</button>
+                        </div>
+                        <div id="vncContainer"></div>
+                        <script>
+                            var correctPassword = '$password';
+                            
+                            function authenticate() {
+                                var password = document.getElementById('password').value;
+                                if (password === correctPassword) {
+                                    document.getElementById('authForm').style.display = 'none';
+                                    document.getElementById('vncContainer').style.display = 'block';
+                                    loadVNC();
+                                } else {
+                                    alert('Invalid password!');
+                                }
+                            }
+                            
+                            function loadVNC() {
+                                var script = document.createElement('script');
+                                script.src = 'app/ui.js';
+                                script.onload = function() {
+                                    // Initialize noVNC with correct WebSocket path
+                                    var host = window.location.hostname;
+                                    var port = 6080;
+                                    var path = 'websockify';
+                                    
+                                    // Override default settings
+                                    var settings = {
+                                        host: host,
+                                        port: port,
+                                        path: path,
+                                        encrypt: false,
+                                        password: '$password'
+                                    };
+                                    
+                                    // Create the UI
+                                    var UI = new RFB(document.getElementById('vncContainer'), 
+                                        'ws://' + host + ':' + port + '/' + path,
+                                        {
+                                            credentials: {
+                                                password: '$password'
+                                            }
+                                        }
+                                    );
+                                    
+                                    // Add connection status
+                                    UI.addEventListener('connect', function() {
+                                        console.log('Connected to VNC server');
+                                    });
+                                    
+                                    UI.addEventListener('disconnect', function(e) {
+                                        console.log('Disconnected: ' + e.detail.reason);
+                                    });
+                                    
+                                    UI.addEventListener('error', function(e) {
+                                        console.error('Error: ' + e.detail.reason);
+                                    });
+                                };
+                                document.body.appendChild(script);
+                                
+                                // Also load CSS
+                                var css = document.createElement('link');
+                                css.rel = 'stylesheet';
+                                css.href = 'app/styles/base.css';
+                                document.head.appendChild(css);
+                            }
+                            
+                            // Handle Enter key
+                            document.getElementById('password').addEventListener('keydown', function(e) {
+                                if (e.key === 'Enter') {
+                                    authenticate();
+                                }
+                            });
+                        </script>
+                    </body>
+                    </html>
+                    "@
+                    $novncHtml | Out-File -FilePath "C:\web-services\index.html" -Encoding UTF8
+
+                    Write-Host "✅ noVNC installed with authentication"
+
             - name: Setup noVNC Web Server with Authentication
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
               run: |
-                    # Create authentication middleware for noVNC
+                    # Create simple HTTP server for noVNC
                     $password = $env:RDP_PASSWORD
-                    $authServer = @'
+                    
+                    # Create a simple Node.js server that serves noVNC files and handles authentication
+                    $serverJs = @'
                     const http = require('http');
                     const fs = require('fs');
                     const path = require('path');
+                    const { exec } = require('child_process');
                     
                     const password = fs.readFileSync('C:\\web-services\\password.txt', 'utf8').trim();
                     const webDir = 'C:\\web-services\\novnc';
+                    
+                    // Start websockify to bridge VNC on port 5900
+                    exec('python -m websockify --web=C:\\web-services\\novnc 6080 localhost:5900', (error, stdout, stderr) => {
+                        if (error) {
+                            console.error(`websockify error: ${error}`);
+                            return;
+                        }
+                        console.log(`websockify output: ${stdout}`);
+                    });
                     
                     const server = http.createServer((req, res) => {
                         // Handle authentication
@@ -544,8 +687,29 @@ jobs:
                             return;
                         }
                         
-                        // Serve files
-                        let filePath = path.join(webDir, req.url === '/' ? 'vnc.html' : req.url);
+                        // Serve the index.html (our password page) for root
+                        if (req.url === '/') {
+                            fs.readFile('C:\\web-services\\index.html', (err, data) => {
+                                if (err) {
+                                    res.writeHead(404);
+                                    res.end('File not found');
+                                    return;
+                                }
+                                res.writeHead(200, { 'Content-Type': 'text/html' });
+                                res.end(data);
+                            });
+                            return;
+                        }
+                        
+                        // Serve noVNC files
+                        let filePath = path.join(webDir, req.url);
+                        // Security: prevent directory traversal
+                        if (!filePath.startsWith(webDir)) {
+                            res.writeHead(403);
+                            res.end('Forbidden');
+                            return;
+                        }
+                        
                         const ext = path.extname(filePath);
                         const contentType = {
                             '.html': 'text/html',
@@ -553,13 +717,16 @@ jobs:
                             '.css': 'text/css',
                             '.png': 'image/png',
                             '.gif': 'image/gif',
-                            '.svg': 'image/svg+xml'
+                            '.svg': 'image/svg+xml',
+                            '.woff': 'font/woff',
+                            '.woff2': 'font/woff2',
+                            '.ttf': 'font/ttf'
                         }[ext] || 'text/plain';
                         
                         fs.readFile(filePath, (err, data) => {
                             if (err) {
                                 res.writeHead(404);
-                                res.end('File not found');
+                                res.end('File not found: ' + req.url);
                                 return;
                             }
                             res.writeHead(200, { 'Content-Type': contentType });
@@ -567,19 +734,106 @@ jobs:
                         });
                     });
                     
-                    server.listen(6080, () => {
+                    server.listen(6080, '0.0.0.0', () => {
                         console.log('noVNC server running on port 6080');
+                        console.log('Password required for access');
                     });
                     '@
-                    $authServer | Out-File -FilePath "C:\web-services\auth-server.js" -Encoding ASCII
+                    $serverJs | Out-File -FilePath "C:\web-services\server.js" -Encoding ASCII
 
-                    # Start noVNC web server
-                    Start-Process -FilePath "node" -ArgumentList "C:\web-services\auth-server.js" -WindowStyle Hidden
-
-                    # Start websockify to bridge VNC
-                    Start-Process -FilePath "python" -ArgumentList "-m websockify --web=C:\web-services\novnc 5900 localhost:5900" -WindowStyle Hidden
+                    # Start the server
+                    Start-Process -FilePath "node" -ArgumentList "C:\web-services\server.js" -WindowStyle Hidden
                     
                     Write-Host "✅ noVNC web server started on port 6080"
+
+            - name: Create SSH Web Interface with Authentication
+              env:
+                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+              run: |
+                    # Store RDP password for SSH service
+                    $password = $env:RDP_PASSWORD
+                    $password | Out-File -FilePath "C:\web-services\sshpassword.txt" -Encoding ASCII
+
+                    # Create SSH web server with authentication
+                    $sshWebHtml = @"
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>SSH Web Client</title>
+                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
+                        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
+                        <style>
+                            body { margin: 0; padding: 20px; background: #1a1a2e; font-family: Arial, sans-serif; }
+                            #authForm { max-width: 400px; margin: 100px auto; padding: 30px; background: #16213e; border-radius: 10px; color: #eee; }
+                            #terminalContainer { display: none; width: 100vw; height: 100vh; }
+                            input { width: 100%; padding: 10px; margin: 10px 0; background: #0f3460; color: #eee; border: none; border-radius: 5px; }
+                            button { width: 100%; padding: 10px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
+                            button:hover { background: #c73e54; }
+                            h2 { text-align: center; }
+                            #terminal { height: 90vh; }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="authForm">
+                            <h2>🔐 SSH Authentication Required</h2>
+                            <p>Enter password to access SSH</p>
+                            <input type="password" id="sshPassword" placeholder="Enter password" />
+                            <button onclick="authenticateSSH()">Connect to SSH</button>
+                        </div>
+                        <div id="terminalContainer">
+                            <div id="terminal"></div>
+                        </div>
+                        <script>
+                            function authenticateSSH() {
+                                var password = document.getElementById('sshPassword').value;
+                                var xhr = new XMLHttpRequest();
+                                xhr.open('POST', '/sshauth', false);
+                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                                xhr.send('password=' + encodeURIComponent(password));
+                                if (xhr.status === 200) {
+                                    document.getElementById('authForm').style.display = 'none';
+                                    document.getElementById('terminalContainer').style.display = 'block';
+                                    connectSSH();
+                                } else {
+                                    alert('Invalid password!');
+                                }
+                            }
+                            function connectSSH() {
+                                const term = new Terminal();
+                                const fitAddon = new FitAddon.FitAddon();
+                                term.loadAddon(fitAddon);
+                                term.open(document.getElementById('terminal'));
+                                fitAddon.fit();
+                                term.writeln('\x1b[1;32mConnected to SSH Server\x1b[0m');
+                                term.writeln('Type your SSH commands below...');
+                                term.writeln('Example: ssh runneradmin@localhost');
+                                
+                                const ws = new WebSocket('ws://' + window.location.hostname + ':8080/ssh');
+                                ws.onopen = function() {
+                                    term.writeln('\x1b[1;32mWebSocket connected!\x1b[0m');
+                                };
+                                ws.onmessage = function(e) {
+                                    term.write(e.data);
+                                };
+                                ws.onerror = function(e) {
+                                    term.writeln('\x1b[1;31mWebSocket error\x1b[0m');
+                                };
+                                ws.onclose = function() {
+                                    term.writeln('\x1b[1;31mWebSocket closed\x1b[0m');
+                                };
+                                
+                                term.onData(function(data) {
+                                    ws.send(data);
+                                });
+                            }
+                        </script>
+                    </body>
+                    </html>
+                    "@
+                    $sshWebHtml | Out-File -FilePath "C:\web-services\ssh.html" -Encoding UTF8
+
+                    Write-Host "✅ SSH Web interface created"
 
             - name: Setup SSH Web Server with Authentication
               env:
@@ -624,7 +878,7 @@ jobs:
                         });
                     });
                     
-                    httpServer.listen(8080, () => {
+                    httpServer.listen(8080, '0.0.0.0', () => {
                         console.log('SSH Web server running on port 8080');
                     });
                     
