@@ -592,7 +592,7 @@ jobs:
             - name: Password-Protected Shutdown Listener
               shell: pwsh
               env:
-                  SHUTDOWN_PASSWORD: ${{ secrets.SHUTDOWN_PASSWORD }}
+                  SHUTDOWN_PASSWORD: ${{ secrets.RDP_PASSWORD }}
               run: |
                     $password = $env:SHUTDOWN_PASSWORD
                     if ([string]::IsNullOrEmpty($password)) {
@@ -630,12 +630,26 @@ jobs:
                             if ([string]::IsNullOrEmpty($Password) -or $attempt -eq $Password) {
                                 $writer.WriteLine("Password correct! Shutting down...")
                                 $writer.Flush()
-                                Start-Sleep -Seconds 1
                                 
+                                # Create stop signal file
                                 [System.IO.File]::WriteAllText("C:\Users\runneradmin\Documents\stopmachine", "")
                                 
-                                $writer.WriteLine("Shutdown initiated!")
+                                # Logout of Tailscale
+                                try {
+                                    $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
+                                    if (Test-Path $tailscalePath) {
+                                        Start-Process -FilePath $tailscalePath -ArgumentList "logout" -WindowStyle Hidden -Wait -Timeout 10
+                                        Write-Host "✅ Tailscale logout initiated"
+                                    }
+                                } catch {
+                                    Write-Host "⚠️ Failed to logout Tailscale: $_"
+                                }
+                                
+                                # Send final message and close connection
+                                $writer.WriteLine("Shutdown initiated! Disconnecting...")
                                 $writer.Flush()
+                                Start-Sleep -Milliseconds 500
+                                
                                 Write-Host "✅ Shutdown triggered successfully!"
                             } else {
                                 $writer.WriteLine("Invalid password! Connection closed.")
