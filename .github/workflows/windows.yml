@@ -357,9 +357,9 @@ jobs:
                             }
                             
                             function loadVNC() {
-                                // Load noVNC via iframe to avoid import issues
+                                // Load noVNC via iframe with correct port
                                 var iframe = document.createElement('iframe');
-                                iframe.src = '/vnc.html';
+                                iframe.src = '/vnc.html?host=' + window.location.hostname + '&port=6081&password=' + encodeURIComponent(document.getElementById('password').value);
                                 iframe.style.width = '100%';
                                 iframe.style.height = '100%';
                                 iframe.style.border = 'none';
@@ -376,6 +376,71 @@ jobs:
                     </html>
                     "@
                     $novncHtml | Out-File -FilePath "C:\web-services\index.html" -Encoding UTF8
+
+                    # Create a custom vnc.html that uses the correct WebSocket port
+                    $customVncHtml = @'
+                    <!DOCTYPE html>
+                    <html lang="en">
+                    <head>
+                        <meta charset="utf-8">
+                        <title>noVNC</title>
+                        <link rel="stylesheet" href="app/styles/base.css">
+                        <link rel="preload" href="app/images/info.svg" as="image">
+                        <link rel="preload" href="app/images/warning.svg" as="image">
+                    </head>
+                    <body>
+                        <div id="noVNC_container">
+                            <div id="noVNC_status_bar" class="noVNC_status_bar" style="display: none;">
+                                <div id="noVNC_status">Loading...</div>
+                            </div>
+                            <div id="noVNC_screen"></div>
+                        </div>
+                        <script src="app/rfb.js"></script>
+                        <script>
+                            var host = new URLSearchParams(window.location.search).get('host') || window.location.hostname;
+                            var port = parseInt(new URLSearchParams(window.location.search).get('port')) || 6081;
+                            var password = new URLSearchParams(window.location.search).get('password') || '';
+                            
+                            var rfb = new RFB(document.getElementById('noVNC_screen'), 
+                                'ws://' + host + ':' + port + '/websockify',
+                                {
+                                    credentials: {
+                                        password: password
+                                    }
+                                }
+                            );
+                            
+                            rfb.addEventListener('connect', function() {
+                                document.getElementById('noVNC_status').innerHTML = 'Connected';
+                                document.getElementById('noVNC_status_bar').style.display = 'block';
+                            });
+                            
+                            rfb.addEventListener('disconnect', function(e) {
+                                document.getElementById('noVNC_status').innerHTML = 'Disconnected: ' + e.detail.reason;
+                                document.getElementById('noVNC_status_bar').style.display = 'block';
+                            });
+                            
+                            rfb.addEventListener('error', function(e) {
+                                document.getElementById('noVNC_status').innerHTML = 'Error: ' + e.detail.reason;
+                                document.getElementById('noVNC_status_bar').style.display = 'block';
+                            });
+                            
+                            // Resize handler
+                            window.addEventListener('resize', function() {
+                                var screen = document.getElementById('noVNC_screen');
+                                if (screen) {
+                                    screen.style.width = window.innerWidth + 'px';
+                                    screen.style.height = (window.innerHeight - 40) + 'px';
+                                }
+                            });
+                            
+                            // Initial resize
+                            window.dispatchEvent(new Event('resize'));
+                        </script>
+                    </body>
+                    </html>
+                    '@
+                    $customVncHtml | Out-File -FilePath "C:\web-services\vnc.html" -Encoding UTF8
 
                     # Create SSH web interface HTML
                     $sshWebHtml = @"
@@ -534,13 +599,22 @@ jobs:
                     const password = fs.readFileSync('C:\\web-services\\password.txt', 'utf8').trim();
                     const webDir = 'C:\\web-services\\novnc';
                     
-                    // Start websockify
-                    exec('python -m websockify --web=' + webDir + ' 6081 localhost:5900', (error, stdout, stderr) => {
+                    // Start websockify on port 6081
+                    const websockify = exec('python -m websockify --web=' + webDir + ' 6081 localhost:5900', (error, stdout, stderr) => {
                         if (error) {
                             console.error(`websockify error: ${error}`);
                             return;
                         }
                         console.log(`websockify started on port 6081`);
+                    });
+                    
+                    // Log websockify output
+                    websockify.stdout.on('data', (data) => {
+                        console.log(`websockify: ${data}`);
+                    });
+                    
+                    websockify.stderr.on('data', (data) => {
+                        console.error(`websockify stderr: ${data}`);
                     });
                     
                     const server = http.createServer((req, res) => {
@@ -575,23 +649,21 @@ jobs:
                             return;
                         }
                         
-                        // Serve noVNC files - rewrite vnc.html to use correct websocket port
-                        if (req.url === '/vnc.html') {
-                            fs.readFile(path.join(webDir, 'vnc.html'), 'utf8', (err, data) => {
+                        // Serve our custom vnc.html
+                        if (req.url.startsWith('/vnc.html')) {
+                            fs.readFile('C:\\web-services\\vnc.html', (err, data) => {
                                 if (err) {
                                     res.writeHead(404);
                                     res.end('File not found');
                                     return;
                                 }
-                                // Replace the default websocket port with our websockify port
-                                var modified = data.replace(/var port.*?;/g, 'var port = 6081;');
                                 res.writeHead(200, { 'Content-Type': 'text/html' });
-                                res.end(modified);
+                                res.end(data);
                             });
                             return;
                         }
                         
-                        // Serve other noVNC files
+                        // Serve noVNC static files
                         let filePath = path.join(webDir, req.url);
                         if (!filePath.startsWith(webDir)) {
                             res.writeHead(403);
@@ -626,6 +698,7 @@ jobs:
                     server.listen(6080, '0.0.0.0', () => {
                         console.log('noVNC server running on port 6080');
                         console.log('Password required for access');
+                        console.log('WebSocket running on port 6081');
                     });
                     '@
                     $serverJs | Out-File -FilePath "C:\web-services\server.js" -Encoding ASCII
