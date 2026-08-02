@@ -134,6 +134,7 @@ jobs:
                     if ('${{ inputs.install_vlc }}' -eq 'true') { $apps += "vlc" }
 
                     if ($apps.Count -gt 0) {
+                        # Install each package individually
                         foreach ($app in $apps) {
                             Write-Host "Installing $app..."
                             choco install $app -y
@@ -143,6 +144,7 @@ jobs:
                         }
                         Start-Sleep -Seconds 5
 
+                        # Pin Chrome to taskbar if installed
                         if ('${{ inputs.install_chrome }}' -eq 'true') {
                             $shell = New-Object -ComObject Shell.Application
                             $path = "C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -151,6 +153,7 @@ jobs:
                             }
                         }
 
+                        # Pin VS Code to taskbar if installed
                         if ('${{ inputs.install_vscode }}' -eq 'true') {
                             $vscodePath = "C:\Program Files\Microsoft VS Code\Code.exe"
                             if (Test-Path $vscodePath) {
@@ -186,6 +189,7 @@ jobs:
               if: inputs.remove_browser_policies
               shell: powershell
               run: |
+                    # Target registry paths where "Managed by your organization" policies live
                     $browserPolicies = @(
                         "HKLM:\SOFTWARE\Policies\Google\Chrome",
                         "HKCU:\SOFTWARE\Policies\Google\Chrome",
@@ -199,6 +203,7 @@ jobs:
                         "HKCU:\SOFTWARE\Policies\Vivaldi"
                     )
 
+                    # Force delete the browser policy keys
                     foreach ($path in $browserPolicies) {
                         if (Test-Path $path) {
                             Remove-Item -Path $path -Recurse -Force
@@ -206,6 +211,7 @@ jobs:
                         }
                     }
 
+                    # Restart the Windows Explorer shell to apply registry changes immediately
                     Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
                     Write-Host "All browser enterprise configurations cleared!"
 
@@ -215,23 +221,35 @@ jobs:
                     try {
                         $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
                         if (Test-Path $chromePath) {
+                            # Download Ghostery extension CRX
                             $extensionUrl = "https://clients2.google.com/service/update2/crx?response=redirect&os=win&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
                             $crxPath = "$env:TEMP\ghostery.crx"
                             Invoke-WebRequest -Uri $extensionUrl -OutFile $crxPath -ErrorAction Stop
 
+                            # Get Chrome profile path
                             $profilePath = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default"
+
+                            # Create extensions folder if it doesn't exist
                             $extensionsPath = "$profilePath\Extensions\mlomiejdfkolichcflejclcbmpeaniij"
                             New-Item -Path $extensionsPath -ItemType Directory -Force | Out-Null
 
+                            # Unzip the CRX (CRX is a zip file with a different header)
+                            # We'll use 7-Zip to extract since it's already installed
                             $tempExtractPath = "$env:TEMP\ghostery_extract"
                             New-Item -Path $tempExtractPath -ItemType Directory -Force | Out-Null
 
+                            # Use 7-Zip to extract
                             $sevenZip = "C:\Program Files\7-Zip\7z.exe"
                             if (Test-Path $sevenZip) {
                                 & $sevenZip x $crxPath -o"$tempExtractPath" -y | Out-Null
+
+                                # Copy the extension to Chrome's extensions folder
                                 Copy-Item -Path "$tempExtractPath\*" -Destination $extensionsPath -Recurse -Force
+
+                                # Clean up
                                 Remove-Item -Path $tempExtractPath -Recurse -Force -ErrorAction SilentlyContinue
                                 Remove-Item -Path $crxPath -Force -ErrorAction SilentlyContinue
+
                                 Write-Host "✅ Ghostery extension installed"
                             }
                         }
@@ -257,7 +275,10 @@ jobs:
 
             - name: Configure Firewall for SSH and RDP
               run: |
+                    # RDP Firewall Rule
                     Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+                    # SSH Firewall Rule - Check if exists first
                     $ruleExists = Get-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -ErrorAction SilentlyContinue
                     if (-not $ruleExists) {
                         New-NetFirewallRule -Name "OpenSSH-Server-In-TCP" -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
@@ -266,548 +287,14 @@ jobs:
                         Write-Host "✅ SSH firewall rule already exists"
                     }
 
+                    # IIS Firewall Rule
                     $iisRuleExists = Get-NetFirewallRule -Name "IIS-HTTP-In-TCP" -ErrorAction SilentlyContinue
                     if (-not $iisRuleExists) {
                         New-NetFirewallRule -Name "IIS-HTTP-In-TCP" -DisplayName "IIS HTTP" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 80
                         Write-Host "✅ IIS HTTP firewall rule created"
                     }
-                    
-                    # Firewall rules for noVNC (port 6080) and SSH Web (port 8080)
-                    New-NetFirewallRule -Name "noVNC-In-TCP" -DisplayName "noVNC Web Port" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 6080
-                    New-NetFirewallRule -Name "SSHWeb-In-TCP" -DisplayName "SSH Web Port" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 8080
-                    New-NetFirewallRule -Name "Netcat-Shutdown-In-TCP" -DisplayName "Netcat Shutdown Control" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 2266
-                    
+
                     Write-Host "✅ Firewall rules configured"
-
-            - name: Setup Web Services (noVNC and SSH Web)
-              env:
-                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-              run: |
-                    # Install Node.js dependencies
-                    npm install -g http-server websockify ws
-
-                    # Create directory for web services
-                    mkdir C:\web-services
-                    cd C:\web-services
-
-                    # Download noVNC
-                    Invoke-WebRequest -Uri "https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.zip" -OutFile "novnc.zip"
-                    Expand-Archive -Path "novnc.zip" -DestinationPath "."
-                    Move-Item -Path ".\noVNC-1.4.0\*" -Destination ".\novnc" -Force
-                    Remove-Item -Path ".\noVNC-1.4.0" -Recurse -Force
-                    Remove-Item -Path ".\novnc.zip" -Force
-
-                    # Download websockify for noVNC
-                    Invoke-WebRequest -Uri "https://github.com/novnc/websockify/archive/refs/tags/v0.12.0.zip" -OutFile "websockify.zip"
-                    Expand-Archive -Path "websockify.zip" -DestinationPath "."
-                    Move-Item -Path ".\websockify-0.12.0\*" -Destination ".\websockify" -Force
-                    Remove-Item -Path ".\websockify-0.12.0" -Recurse -Force
-                    Remove-Item -Path ".\websockify.zip" -Force
-
-                    # Store RDP password for services (clean, no extra whitespace)
-                    $password = $env:RDP_PASSWORD.Trim()
-                    $password | Out-File -FilePath "C:\web-services\password.txt" -Encoding ASCII -NoNewline
-                    $password | Out-File -FilePath "C:\web-services\sshpassword.txt" -Encoding ASCII -NoNewline
-                    $password | Out-File -FilePath "C:\web-services\shutdownpassword.txt" -Encoding ASCII -NoNewline
-
-                    # Create password-protected noVNC HTML - Password checked server-side
-                    $novncHtml = @"
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>noVNC with Authentication</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #eee; }
-                            #authForm { max-width: 400px; margin: 100px auto; padding: 30px; background: #16213e; border-radius: 10px; }
-                            input { width: 100%; padding: 10px; margin: 10px 0; background: #0f3460; color: #eee; border: none; border-radius: 5px; }
-                            button { width: 100%; padding: 10px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
-                            button:hover { background: #c73e54; }
-                            #vncContainer { width: 100vw; height: 100vh; display: none; }
-                            h2 { text-align: center; }
-                            .error { color: #ff6b6b; text-align: center; margin-top: 10px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="authForm">
-                            <h2>🔐 Authentication Required</h2>
-                            <p>Enter password to access VNC</p>
-                            <input type="password" id="password" placeholder="Enter password" />
-                            <button onclick="authenticate()">Connect</button>
-                            <div id="errorMsg" class="error"></div>
-                        </div>
-                        <div id="vncContainer"></div>
-                        <script>
-                            function authenticate() {
-                                var password = document.getElementById('password').value;
-                                var xhr = new XMLHttpRequest();
-                                xhr.open('POST', '/auth', true);
-                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                xhr.onreadystatechange = function() {
-                                    if (xhr.readyState === 4) {
-                                        if (xhr.status === 200) {
-                                            document.getElementById('authForm').style.display = 'none';
-                                            document.getElementById('vncContainer').style.display = 'block';
-                                            loadVNC();
-                                        } else {
-                                            document.getElementById('errorMsg').innerHTML = 'Invalid password!';
-                                        }
-                                    }
-                                };
-                                xhr.send('password=' + encodeURIComponent(password));
-                            }
-                            
-                            function loadVNC() {
-                                // Load noVNC via iframe with correct port
-                                var iframe = document.createElement('iframe');
-                                iframe.src = '/vnc.html?host=' + window.location.hostname + '&port=6081&password=' + encodeURIComponent(document.getElementById('password').value);
-                                iframe.style.width = '100%';
-                                iframe.style.height = '100%';
-                                iframe.style.border = 'none';
-                                document.getElementById('vncContainer').appendChild(iframe);
-                            }
-                            
-                            document.getElementById('password').addEventListener('keydown', function(e) {
-                                if (e.key === 'Enter') {
-                                    authenticate();
-                                }
-                            });
-                        </script>
-                    </body>
-                    </html>
-                    "@
-                    $novncHtml | Out-File -FilePath "C:\web-services\index.html" -Encoding UTF8
-
-                    # Create a custom vnc.html that uses the correct WebSocket port
-                    $customVncHtml = @'
-                    <!DOCTYPE html>
-                    <html lang="en">
-                    <head>
-                        <meta charset="utf-8">
-                        <title>noVNC</title>
-                        <link rel="stylesheet" href="app/styles/base.css">
-                        <link rel="preload" href="app/images/info.svg" as="image">
-                        <link rel="preload" href="app/images/warning.svg" as="image">
-                    </head>
-                    <body>
-                        <div id="noVNC_container">
-                            <div id="noVNC_status_bar" class="noVNC_status_bar" style="display: none;">
-                                <div id="noVNC_status">Loading...</div>
-                            </div>
-                            <div id="noVNC_screen"></div>
-                        </div>
-                        <script src="app/rfb.js"></script>
-                        <script>
-                            var host = new URLSearchParams(window.location.search).get('host') || window.location.hostname;
-                            var port = parseInt(new URLSearchParams(window.location.search).get('port')) || 6081;
-                            var password = new URLSearchParams(window.location.search).get('password') || '';
-                            
-                            var rfb = new RFB(document.getElementById('noVNC_screen'), 
-                                'ws://' + host + ':' + port + '/websockify',
-                                {
-                                    credentials: {
-                                        password: password
-                                    }
-                                }
-                            );
-                            
-                            rfb.addEventListener('connect', function() {
-                                document.getElementById('noVNC_status').innerHTML = 'Connected';
-                                document.getElementById('noVNC_status_bar').style.display = 'block';
-                            });
-                            
-                            rfb.addEventListener('disconnect', function(e) {
-                                document.getElementById('noVNC_status').innerHTML = 'Disconnected: ' + e.detail.reason;
-                                document.getElementById('noVNC_status_bar').style.display = 'block';
-                            });
-                            
-                            rfb.addEventListener('error', function(e) {
-                                document.getElementById('noVNC_status').innerHTML = 'Error: ' + e.detail.reason;
-                                document.getElementById('noVNC_status_bar').style.display = 'block';
-                            });
-                            
-                            // Resize handler
-                            window.addEventListener('resize', function() {
-                                var screen = document.getElementById('noVNC_screen');
-                                if (screen) {
-                                    screen.style.width = window.innerWidth + 'px';
-                                    screen.style.height = (window.innerHeight - 40) + 'px';
-                                }
-                            });
-                            
-                            // Initial resize
-                            window.dispatchEvent(new Event('resize'));
-                        </script>
-                    </body>
-                    </html>
-                    '@
-                    $customVncHtml | Out-File -FilePath "C:\web-services\vnc.html" -Encoding UTF8
-
-                    # Create SSH web interface HTML
-                    $sshWebHtml = @"
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>SSH Web Client</title>
-                        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.css">
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.3.0/xterm.min.js"></script>
-                        <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
-                        <style>
-                            body { margin: 0; padding: 20px; background: #1a1a2e; font-family: Arial, sans-serif; }
-                            #authForm { max-width: 400px; margin: 100px auto; padding: 30px; background: #16213e; border-radius: 10px; color: #eee; }
-                            #terminalContainer { display: none; width: 100vw; height: 100vh; }
-                            input { width: 100%; padding: 10px; margin: 10px 0; background: #0f3460; color: #eee; border: none; border-radius: 5px; }
-                            button { width: 100%; padding: 10px; background: #e94560; color: white; border: none; border-radius: 5px; cursor: pointer; }
-                            button:hover { background: #c73e54; }
-                            h2 { text-align: center; }
-                            #terminal { height: 90vh; }
-                            .error { color: #ff6b6b; text-align: center; margin-top: 10px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="authForm">
-                            <h2>🔐 SSH Authentication Required</h2>
-                            <p>Enter password to access SSH</p>
-                            <input type="password" id="sshPassword" placeholder="Enter password" />
-                            <button onclick="authenticateSSH()">Connect to SSH</button>
-                            <div id="errorMsg" class="error"></div>
-                        </div>
-                        <div id="terminalContainer">
-                            <div id="terminal"></div>
-                        </div>
-                        <script>
-                            function authenticateSSH() {
-                                var password = document.getElementById('sshPassword').value;
-                                var xhr = new XMLHttpRequest();
-                                xhr.open('POST', '/sshauth', true);
-                                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                                xhr.onreadystatechange = function() {
-                                    if (xhr.readyState === 4) {
-                                        if (xhr.status === 200) {
-                                            document.getElementById('authForm').style.display = 'none';
-                                            document.getElementById('terminalContainer').style.display = 'block';
-                                            connectSSH();
-                                        } else {
-                                            document.getElementById('errorMsg').innerHTML = 'Invalid password!';
-                                        }
-                                    }
-                                };
-                                xhr.send('password=' + encodeURIComponent(password));
-                            }
-                            
-                            function connectSSH() {
-                                const term = new Terminal();
-                                const fitAddon = new FitAddon.FitAddon();
-                                term.loadAddon(fitAddon);
-                                term.open(document.getElementById('terminal'));
-                                fitAddon.fit();
-                                term.writeln('\x1b[1;32mConnected to SSH Server\x1b[0m');
-                                term.writeln('Type your SSH commands below...');
-                                term.writeln('Example: ssh runneradmin@localhost');
-                                
-                                const ws = new WebSocket('ws://' + window.location.hostname + ':8081');
-                                ws.onopen = function() {
-                                    term.writeln('\x1b[1;32mWebSocket connected!\x1b[0m');
-                                };
-                                ws.onmessage = function(e) {
-                                    term.write(e.data);
-                                };
-                                ws.onerror = function(e) {
-                                    term.writeln('\x1b[1;31mWebSocket error\x1b[0m');
-                                };
-                                ws.onclose = function() {
-                                    term.writeln('\x1b[1;31mWebSocket closed\x1b[0m');
-                                };
-                                
-                                term.onData(function(data) {
-                                    ws.send(data);
-                                });
-                            }
-                            
-                            document.getElementById('sshPassword').addEventListener('keydown', function(e) {
-                                if (e.key === 'Enter') {
-                                    authenticateSSH();
-                                }
-                            });
-                        </script>
-                    </body>
-                    </html>
-                    "@
-                    $sshWebHtml | Out-File -FilePath "C:\web-services\ssh.html" -Encoding UTF8
-
-                    # Create Netcat shutdown server PowerShell script
-                    $ncScript = @'
-                    param($Port = 2266, $PasswordFile = "C:\web-services\shutdownpassword.txt")
-                    
-                    $shutdownPass = (Get-Content -Path $PasswordFile -Raw).Trim()
-                    
-                    Write-Host "Shutdown server running on port $Port"
-                    Write-Host "Password loaded (length: $($shutdownPass.Length))"
-                    
-                    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $Port)
-                    $listener.Start()
-                    Write-Host "Listening on port $Port..."
-                    
-                    while ($true) {
-                        try {
-                            $client = $listener.AcceptTcpClient()
-                            $stream = $client.GetStream()
-                            $writer = New-Object System.IO.StreamWriter($stream)
-                            $reader = New-Object System.IO.StreamReader($stream)
-                            
-                            $writer.WriteLine("Enter shutdown password:")
-                            $writer.Flush()
-                            
-                            $attempt = $reader.ReadLine()
-                            if ($attempt) {
-                                $attempt = $attempt.Trim()
-                            }
-                            
-                            Write-Host "Password attempt received (length: $($attempt.Length))"
-                            Write-Host "Expected password length: $($shutdownPass.Length)"
-                            
-                            if ($attempt -eq $shutdownPass) {
-                                $writer.WriteLine("Password correct! Shutting down...")
-                                $writer.Flush()
-                                Start-Sleep -Seconds 1
-                                
-                                [System.IO.File]::WriteAllText("C:\Users\runneradmin\Documents\stopmachine", "")
-                                
-                                $writer.WriteLine("Shutdown initiated!")
-                                $writer.Flush()
-                                Write-Host "✅ Shutdown triggered successfully!"
-                            } else {
-                                $writer.WriteLine("Invalid password! Connection closed.")
-                                $writer.Flush()
-                                Write-Host "❌ Invalid password attempt"
-                            }
-                            
-                            $client.Close()
-                        } catch {
-                            Write-Host "Error: $_"
-                        }
-                    }
-                    '@
-                    $ncScript | Out-File -FilePath "C:\web-services\nc-server.ps1" -Encoding ASCII
-
-                    # Create noVNC server
-                    $serverJs = @'
-                    const http = require('http');
-                    const fs = require('fs');
-                    const path = require('path');
-                    const { exec } = require('child_process');
-                    
-                    const password = fs.readFileSync('C:\\web-services\\password.txt', 'utf8').trim();
-                    const webDir = 'C:\\web-services\\novnc';
-                    
-                    // Start websockify on port 6081
-                    const websockify = exec('python -m websockify --web=' + webDir + ' 6081 localhost:5900', (error, stdout, stderr) => {
-                        if (error) {
-                            console.error(`websockify error: ${error}`);
-                            return;
-                        }
-                        console.log(`websockify started on port 6081`);
-                    });
-                    
-                    // Log websockify output
-                    websockify.stdout.on('data', (data) => {
-                        console.log(`websockify: ${data}`);
-                    });
-                    
-                    websockify.stderr.on('data', (data) => {
-                        console.error(`websockify stderr: ${data}`);
-                    });
-                    
-                    const server = http.createServer((req, res) => {
-                        // Handle authentication
-                        if (req.url === '/auth' && req.method === 'POST') {
-                            let body = '';
-                            req.on('data', chunk => body += chunk);
-                            req.on('end', () => {
-                                const params = new URLSearchParams(body);
-                                if (params.get('password') === password) {
-                                    res.writeHead(200);
-                                    res.end('OK');
-                                } else {
-                                    res.writeHead(401);
-                                    res.end('Unauthorized');
-                                }
-                            });
-                            return;
-                        }
-                        
-                        // Serve the index.html (our password page) for root
-                        if (req.url === '/') {
-                            fs.readFile('C:\\web-services\\index.html', (err, data) => {
-                                if (err) {
-                                    res.writeHead(404);
-                                    res.end('File not found');
-                                    return;
-                                }
-                                res.writeHead(200, { 'Content-Type': 'text/html' });
-                                res.end(data);
-                            });
-                            return;
-                        }
-                        
-                        // Serve our custom vnc.html
-                        if (req.url.startsWith('/vnc.html')) {
-                            fs.readFile('C:\\web-services\\vnc.html', (err, data) => {
-                                if (err) {
-                                    res.writeHead(404);
-                                    res.end('File not found');
-                                    return;
-                                }
-                                res.writeHead(200, { 'Content-Type': 'text/html' });
-                                res.end(data);
-                            });
-                            return;
-                        }
-                        
-                        // Serve noVNC static files
-                        let filePath = path.join(webDir, req.url);
-                        if (!filePath.startsWith(webDir)) {
-                            res.writeHead(403);
-                            res.end('Forbidden');
-                            return;
-                        }
-                        
-                        const ext = path.extname(filePath);
-                        const contentType = {
-                            '.html': 'text/html',
-                            '.js': 'application/javascript',
-                            '.css': 'text/css',
-                            '.png': 'image/png',
-                            '.gif': 'image/gif',
-                            '.svg': 'image/svg+xml',
-                            '.woff': 'font/woff',
-                            '.woff2': 'font/woff2',
-                            '.ttf': 'font/ttf'
-                        }[ext] || 'text/plain';
-                        
-                        fs.readFile(filePath, (err, data) => {
-                            if (err) {
-                                res.writeHead(404);
-                                res.end('File not found: ' + req.url);
-                                return;
-                            }
-                            res.writeHead(200, { 'Content-Type': contentType });
-                            res.end(data);
-                        });
-                    });
-                    
-                    server.listen(6080, '0.0.0.0', () => {
-                        console.log('noVNC server running on port 6080');
-                        console.log('Password required for access');
-                        console.log('WebSocket running on port 6081');
-                    });
-                    '@
-                    $serverJs | Out-File -FilePath "C:\web-services\server.js" -Encoding ASCII
-
-                    # Create SSH WebSocket server
-                    $sshWsServer = @'
-                    const WebSocket = require('ws');
-                    const http = require('http');
-                    const fs = require('fs');
-                    const { spawn } = require('child_process');
-                    
-                    const password = fs.readFileSync('C:\\web-services\\sshpassword.txt', 'utf8').trim();
-                    
-                    const httpServer = http.createServer((req, res) => {
-                        if (req.url === '/sshauth' && req.method === 'POST') {
-                            let body = '';
-                            req.on('data', chunk => body += chunk);
-                            req.on('end', () => {
-                                const params = new URLSearchParams(body);
-                                if (params.get('password') === password) {
-                                    res.writeHead(200);
-                                    res.end('OK');
-                                } else {
-                                    res.writeHead(401);
-                                    res.end('Unauthorized');
-                                }
-                            });
-                            return;
-                        }
-                        
-                        fs.readFile('C:\\web-services\\ssh.html', (err, data) => {
-                            if (err) {
-                                res.writeHead(404);
-                                res.end('File not found');
-                                return;
-                            }
-                            res.writeHead(200, { 'Content-Type': 'text/html' });
-                            res.end(data);
-                        });
-                    });
-                    
-                    httpServer.listen(8080, '0.0.0.0', () => {
-                        console.log('SSH Web server running on port 8080');
-                    });
-                    
-                    const wss = new WebSocket.Server({ port: 8081 });
-                    
-                    wss.on('connection', (ws) => {
-                        console.log('SSH WebSocket connected');
-                        let sshProcess = null;
-                        
-                        ws.on('message', (message) => {
-                            const data = message.toString();
-                            if (data.startsWith('ssh ')) {
-                                const parts = data.split(' ');
-                                const target = parts[1] || 'localhost';
-                                const username = parts[2] || 'runneradmin';
-                                
-                                if (sshProcess) {
-                                    sshProcess.kill();
-                                }
-                                
-                                sshProcess = spawn('ssh', ['-o', 'StrictHostKeyChecking=no', `${username}@${target}`]);
-                                
-                                sshProcess.stdout.on('data', (data) => {
-                                    ws.send(data.toString());
-                                });
-                                
-                                sshProcess.stderr.on('data', (data) => {
-                                    ws.send(data.toString());
-                                });
-                                
-                                sshProcess.on('close', (code) => {
-                                    ws.send(`\r\nProcess exited with code ${code}\r\n`);
-                                    sshProcess = null;
-                                });
-                            } else if (sshProcess) {
-                                sshProcess.stdin.write(data);
-                            }
-                        });
-                        
-                        ws.on('close', () => {
-                            if (sshProcess) {
-                                sshProcess.kill();
-                            }
-                        });
-                    });
-                    
-                    console.log('SSH WebSocket server running on port 8081');
-                    '@
-                    $sshWsServer | Out-File -FilePath "C:\web-services\ssh-ws-server.js" -Encoding ASCII
-
-                    Write-Host "✅ Web services configured"
-
-            - name: Start Web Services
-              run: |
-                    # Start noVNC web server
-                    Start-Process -FilePath "node" -ArgumentList "C:\web-services\server.js" -WindowStyle Hidden
-                    
-                    # Start SSH web server
-                    Start-Process -FilePath "node" -ArgumentList "C:\web-services\ssh-ws-server.js" -WindowStyle Hidden
-                    
-                    # Start netcat shutdown server
-                    Start-Process -FilePath "powershell" -ArgumentList "-File C:\web-services\nc-server.ps1" -WindowStyle Hidden
-                    
-                    Write-Host "✅ All web services started"
-                    Write-Host "   noVNC: http://localhost:6080"
-                    Write-Host "   SSH Web: http://localhost:8080"
-                    Write-Host "   Shutdown: nc localhost 2266"
 
             - name: Download Tailscale MSI
               run: |
@@ -856,26 +343,41 @@ jobs:
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
               run: |
+                    # Enable Ultimate Performance power plan
                     powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61
                     powercfg -setactive e9a42b02-d5df-448d-aa00-03f14749eb61
+
+                    # Set monitor to never turn off
                     powercfg -change -monitor-timeout-ac 0
+
+                    # Set disk to never turn off
                     powercfg -change -disk-timeout-ac 0
+
+                    # Disable sleep mode
                     powercfg -change -standby-timeout-ac 0
                     powercfg -change -hibernate-timeout-ac 0
+
+                    # Disable hibernation completely
                     powercfg -hibernate off
+
                     Write-Host "✅ Ultimate Performance plan enabled, sleep/hibernation disabled"
 
             - name: Configure Desktop Icons and Settings
               if: inputs.configure_desktop
               run: |
+                    # Create the registry path if it doesn't exist
                     $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel"
                     if (!(Test-Path $regPath)) {
                         New-Item -Path $regPath -Force | Out-Null
                     }
-                    Set-ItemProperty -Path $regPath -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord
-                    Set-ItemProperty -Path $regPath -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord
-                    Set-ItemProperty -Path $regPath -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord
 
+                    # Show This PC, Control Panel, User's Files on Desktop
+                    # 0 = Show, 1 = Hide
+                    Set-ItemProperty -Path $regPath -Name "{20D04FE0-3AEA-1069-A2D8-08002B30309D}" -Value 0 -Type DWord  # This PC
+                    Set-ItemProperty -Path $regPath -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord  # Control Panel
+                    Set-ItemProperty -Path $regPath -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord  # User's Files
+
+                    # Also set in ClassicStartMenu for compatibility
                     $regPathClassic = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\ClassicStartMenu"
                     if (!(Test-Path $regPathClassic)) {
                         New-Item -Path $regPathClassic -Force | Out-Null
@@ -884,47 +386,67 @@ jobs:
                     Set-ItemProperty -Path $regPathClassic -Name "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}" -Value 0 -Type DWord
                     Set-ItemProperty -Path $regPathClassic -Name "{59031a47-3f72-44a7-89c5-5595fe6b30ee}" -Value 0 -Type DWord
 
+                    # Enable Auto Arrange Icons
                     $desktopBagPath = "HKCU:\Software\Microsoft\Windows\Shell\Bags\1\Desktop"
                     if (!(Test-Path $desktopBagPath)) {
                         New-Item -Path $desktopBagPath -Force | Out-Null
                     }
                     Set-ItemProperty -Path $desktopBagPath -Name "FFlags" -Value 1075839525 -Type DWord
+
                     Write-Host "✅ Desktop icons configured"
 
             - name: Disable Windows 11 Right Click Context Menu (Force Windows 10 Style)
               if: inputs.disable_win11_context
               run: |
+                    # Force Windows 10 style context menu
                     reg.exe add "HKCU\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve
                     Write-Host "✅ Windows 10 style context menu enabled"
 
             - name: Configure Windows Appearance, Performance, and Taskbar
               if: inputs.configure_appearance
               run: |
+                    # Set Dark Theme
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
+
+                    # Set Solid Black Background
                     Set-ItemProperty -Path "HKCU:\Control Panel\Colors" -Name "Background" -Value "0 0 0"
                     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "Wallpaper" -Value ""
 
+                    # Disable ALL Visual Effects EXCEPT Font Smoothing
                     $newMask = [byte[]]@(0x90,0x12,0x03,0x80,0x10,0x00,0x00,0x00)
                     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "UserPreferencesMask" -Value $newMask
+
+                    # Disable all visual effects via System Performance Settings
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2
+
+                    # Disable specific visual effects
                     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0"
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewAlphaSelect" -Value 0
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ListviewShadow" -Value 0
+
+                    # Taskbar Settings - Align Left
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAl" -Value 0
+
+                    # Hide Search Box/Task View
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "ShowTaskViewButton" -Value 0
+
+                    # Disable Transparency Effects
                     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "EnableTransparency" -Value 0
+
                     Write-Host "✅ All theme and performance settings applied"
 
             - name: Disable Telemetry and Unnecessary Services
               if: inputs.disable_telemetry
               run: |
+                    # Disable Telemetry
                     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
                     Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
                     Set-ItemProperty -Path "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Policies\DataCollection" -Name "AllowTelemetry" -Value 0 -Type DWord
 
+                    # Disable Unnecessary Services
                     $services = @(
                         "DiagTrack",
                         "dmwappushservice",
@@ -944,22 +466,27 @@ jobs:
                         Stop-Service $service -ErrorAction SilentlyContinue
                         Set-Service $service -StartupType Disabled -ErrorAction SilentlyContinue
                     }
+
                     Write-Host "✅ Telemetry and unnecessary services disabled"
 
             - name: Disable Windows Search Indexing
               if: inputs.disable_search_index
               run: |
+                    # Disable Windows Search service (already disabled in previous step, but ensure it's stopped)
                     Stop-Service "WSearch" -Force -ErrorAction SilentlyContinue
                     Set-Service "WSearch" -StartupType Disabled -ErrorAction SilentlyContinue
 
+                    # Disable indexing via registry
                     $regPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search"
                     if (!(Test-Path $regPath)) {
                         New-Item -Path $regPath -Force | Out-Null
                     }
+
                     Set-ItemProperty -Path $regPath -Name "DisableIndexer" -Value 1 -Type DWord -Force
                     Set-ItemProperty -Path $regPath -Name "DisableBackoff" -Value 1 -Type DWord -Force
                     Set-ItemProperty -Path $regPath -Name "PreventIndexingOutlook" -Value 1 -Type DWord -Force
 
+                    # Disable indexing for all drives
                     $drives = Get-CimInstance -ClassName Win32_LogicalDisk | Where-Object { $_.DriveType -eq 3 }
                     foreach ($drive in $drives) {
                         $driveLetter = $drive.DeviceID
@@ -968,23 +495,33 @@ jobs:
                         & fsutil.exe behavior set disableencryption 1
                     }
 
+                    # Remove Search Indexer from running processes
                     Get-Process -Name "SearchIndexer" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+                    # Delete the search index database
                     $indexLocation = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\"
                     if (Test-Path $indexLocation) {
                         Remove-Item -Path $indexLocation -Recurse -Force -ErrorAction SilentlyContinue
                     }
+
                     Write-Host "✅ Windows Search indexing disabled"
 
             - name: Disable OneDrive
               if: inputs.disable_onedrive
               run: |
+                    # Disable OneDrive via Group Policy
                     if (!(Test-Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive")) {
                         New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Force
                     }
                     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive" -Name "DisableFileSyncNGSC" -Value 1 -Type DWord
+
+                    # Stop and disable OneDrive service
                     Stop-Process -Name OneDrive -ErrorAction SilentlyContinue
                     Set-Service -Name OneDriveUpdaterService -StartupType Disabled -ErrorAction SilentlyContinue
+
+                    # Remove OneDrive from startup
                     Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "OneDrive" -ErrorAction SilentlyContinue
+
                     Write-Host "✅ OneDrive disabled"
 
             - name: Create Self-Destruct Batch Script on Desktop
@@ -1034,9 +571,10 @@ jobs:
 
                 Write-Host "Python `py` launcher default set to 3.12" -ForegroundColor Green
                 Write-Host "Restart any open terminals for changes to take effect."
-
+            
             - name: Final Restart Explorer (Apply All Changes)
               run: |
+                    # Final restart to apply all changes including theme and context menu
                     taskkill /f /im explorer.exe
                     Start-Process explorer.exe
                     Start-Sleep -Seconds 3
@@ -1045,14 +583,129 @@ jobs:
             - name: Session Activity Logger
               shell: pwsh
               run: |
+                    # Log that the session was used for development
                     $logPath = "C:\session_activity.log"
+
+                    # Log the start
                     "[$(Get-Date)] Session started - Use case: ${{ inputs.legitimate_use_case }}" | Out-File $logPath
 
-            - name: Display Access Information
+            - name: Password-Protected Shutdown Listener
+              shell: pwsh
+              env:
+                  SHUTDOWN_PASSWORD: ${{ secrets.SHUTDOWN_PASSWORD }}
+              run: |
+                    $password = $env:SHUTDOWN_PASSWORD
+                    if ([string]::IsNullOrEmpty($password)) {
+                        Write-Host "⚠️ SHUTDOWN_PASSWORD not set - listener will still run but password validation disabled"
+                    }
+
+                    $listenerScript = @"
+                    # TCP listener on port 2266 with password validation
+                    `$password = "$password"
+                    `$stopFile = "C:\Users\runneradmin\Documents\stopmachine"
+                    `$listenerPort = 2266
+                    
+                    # Create TCP listener
+                    `$listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, `$listenerPort)
+                    `$listener.Start()
+                    
+                    Write-Host "================================================"
+                    Write-Host "🔒 Password-protected shutdown listener running"
+                    Write-Host "   Port: `$listenerPort"
+                    if (-not [string]::IsNullOrEmpty(`$password)) {
+                        Write-Host "   Password: (set in secrets)"
+                    } else {
+                        Write-Host "   ⚠️  Password not set - any connection will trigger shutdown"
+                    }
+                    Write-Host "================================================"
+                    Write-Host "To shutdown VM:"
+                    Write-Host "  nc <ip> `$listenerPort"
+                    Write-Host "  Then type password and press Enter"
+                    Write-Host "================================================"
+                    
+                    while (`$true) {
+                        try {
+                            # Accept client connection
+                            `$client = `$listener.AcceptTcpClient()
+                            `$stream = `$client.GetStream()
+                            `$reader = New-Object System.IO.StreamReader(`$stream)
+                            `$writer = New-Object System.IO.StreamWriter(`$stream)
+                            `$writer.AutoFlush = `$true
+                            
+                            # Send password prompt
+                            `$writer.WriteLine("Password: ")
+                            
+                            # Read password from client with timeout
+                            `$readTask = `$reader.ReadLineAsync()
+                            if (`$readTask.Wait(5000)) {
+                                `$inputPassword = `$readTask.Result
+                                
+                                # Validate password
+                                `$valid = `$false
+                                if (-not [string]::IsNullOrEmpty(`$password)) {
+                                    if (`$inputPassword -eq `$password) {
+                                        `$valid = `$true
+                                    }
+                                } else {
+                                    # If no password set, accept any input
+                                    `$valid = `$true
+                                }
+                                
+                                if (`$valid) {
+                                    `$writer.WriteLine("✅ Password validated. Creating shutdown signal...")
+                                    
+                                    # Create stop signal
+                                    if (-not (Test-Path `$stopFile)) {
+                                        New-Item -Path `$stopFile -ItemType File -Force | Out-Null
+                                    }
+                                    `$writer.WriteLine("✅ Shutdown signal created. VM will shut down within 3 minutes.")
+                                    Write-Host "[`$(Get-Date)] Shutdown triggered via listener from `$($client.Client.RemoteEndPoint.Address)"
+                                } else {
+                                    `$writer.WriteLine("❌ Invalid password. Connection rejected.")
+                                    Write-Host "[`$(Get-Date)] Failed login attempt from `$($client.Client.RemoteEndPoint.Address)"
+                                }
+                            } else {
+                                `$writer.WriteLine("❌ Connection timed out. Please try again.")
+                            }
+                        } catch {
+                            Write-Host "[`$(Get-Date)] Listener error: `$_"
+                        } finally {
+                            if (`$client -ne `$null) {
+                                `$client.Close()
+                            }
+                        }
+                    }
+                    
+                    # Note: This script runs forever, but the main loop will handle shutdown
+                    "# @listenerScript
+
+                    # Save the listener script
+                    $listenerPath = "C:\shutdown_listener.ps1"
+                    $listenerScript | Out-File -FilePath $listenerPath -Encoding ASCII
+
+                    # Add firewall rule for port 2266
+                    New-NetFirewallRule -DisplayName "Shutdown Listener" -Direction Inbound -Protocol TCP -LocalPort 2266 -Action Allow
+
+                    # Start the listener in a background process
+                    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$listenerPath`"" -WindowStyle Hidden
+
+                    Write-Host "✅ Shutdown listener started on port 2266"
+                    Write-Host "   Connect with: nc <ip> 2266"
+                    if (-not [string]::IsNullOrEmpty($env:SHUTDOWN_PASSWORD)) {
+                        Write-Host "   Password is set in repository secrets"
+                    } else {
+                        Write-Host "   ⚠️  WARNING: No password set - anyone can shutdown!"
+                    }
+
+            - name: Monitor Services and Keep Alive with Self-Destruct
               shell: pwsh
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
               run: |
+                    # Fixed session duration: 5 hours 50 minutes = 21000 seconds
+                    $sessionSeconds = 21000
+
+                    # Get Tailscale IP
                     $tailscalePath = "C:\Program Files\Tailscale\tailscale.exe"
                     if (Test-Path $tailscalePath) {
                         $ip = & $tailscalePath ip -4
@@ -1060,26 +713,21 @@ jobs:
                         $ip = "Tailscale not installed"
                     }
 
+                    $password = $env:RDP_PASSWORD
+                    $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
+
                     Write-Host "================================================"
                     Write-Host " ✅ RDP Ready - $ip`:3389"
                     Write-Host " ✅ SSH Ready - $ip`:22"
-                    Write-Host " ✅ noVNC Web - http://$ip`:6080"
-                    Write-Host " ✅ SSH Web - http://$ip`:8080"
-                    Write-Host " ✅ Shutdown Control - nc $ip 2266"
+                    Write-Host " ✅ Shutdown Listener - $ip`:2266"
                     Write-Host "======================================="
                     Write-Host " Username: runneradmin"
                     Write-Host " Password is set in Repository Secrets"
                     Write-Host " "
-                    Write-Host " All services use the same password (RDP_PASSWORD)"
-                    Write-Host "======================================="
                     Write-Host " Connect via SSH: ssh runneradmin@$ip"
                     Write-Host " Connect via RDP: $ip`:3389"
-                    Write-Host " Access noVNC: http://$ip`:6080"
-                    Write-Host " Access SSH Web: http://$ip`:8080"
+                    Write-Host " Connect via Shutdown Listener: nc $ip 2266"
                     Write-Host " "
-                    Write-Host " To shutdown via netcat:"
-                    Write-Host "   nc $ip 2266"
-                    Write-Host "   Enter password when prompted"
                     Write-Host "======================================="
                     Write-Host "  FOR GITHUB HISTORY LOGGING PURPOSES  "
                     Write-Host " "
@@ -1089,26 +737,17 @@ jobs:
                     Write-Host "======================================="
                     Write-Host " This session will run for 5 hrs 50 mins"
                     Write-Host " Run 'Stop-VM.bat' on the desktop to stop early"
-                    Write-Host " OR use netcat shutdown with password above"
+                    Write-Host " Or use: nc $ip 2266 (enter password)"
                     Write-Host "================================================"
 
-            - name: Monitor Services and Keep Alive with Self-Destruct
-              shell: pwsh
-              env:
-                  RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-              run: |
-                    $sessionSeconds = 21000
-                    $stopFile = "C:\Users\runneradmin\Documents\stopmachine"
-
-                    Write-Host "Session will run for 5 hours 50 minutes"
-                    Write-Host "Monitoring for stop signal..."
-
+                    # Run for 5 hours 50 minutes (21,000 seconds)
                     $endTime = (Get-Date).AddSeconds($sessionSeconds)
                     $lastLogMinute = -1
 
                     while ((Get-Date) -lt $endTime) {
-                        Start-Sleep -Seconds 180
+                        Start-Sleep -Seconds 180  # Check every 3 minutes
 
+                        # Check for self-destruct signal
                         if (Test-Path $stopFile) {
                             Write-Host "=========================================="
                             Write-Host "🛑 Self-destruct signal detected!"
@@ -1117,6 +756,7 @@ jobs:
                             break
                         }
 
+                        # Log remaining time every 5 minutes
                         $remaining = [math]::Round(($endTime - (Get-Date)).TotalMinutes)
                         $currentMinute = [math]::Floor($remaining / 5) * 5
                         if ($currentMinute -ne $lastLogMinute -and $remaining -gt 0) {
@@ -1137,8 +777,10 @@ jobs:
               run: |
                   Write-Host "Logging out of Tailscale..."
                   
+                  # Try to logout with 10 second timeout
                   $process = Start-Process -FilePath "C:\Program Files\Tailscale\tailscale.exe" -ArgumentList "logout" -PassThru -WindowStyle Hidden
                   
+                  # Wait up to 10 seconds for the process to exit
                   $timeout = 10
                   $timer = 0
                   while (-not $process.HasExited -and $timer -lt $timeout) {
