@@ -406,6 +406,7 @@ jobs:
             - name: Monitor Services and Keep Alive with Self-Destruct
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
                     SESSION_SECONDS=21000
