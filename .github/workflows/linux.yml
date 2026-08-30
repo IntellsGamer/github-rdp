@@ -397,6 +397,29 @@ jobs:
                     
                     echo "✅ Desktop launchers created"
 
+            - name: Set GitHub Token Environment Variables
+              env:
+                  GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
+              run: |
+                  # Add to /etc/environment for system-wide persistence
+                  echo "GITHUB_TOKEN=$GITHUB_TOKEN" | sudo tee -a /etc/environment
+                  echo "GH_TOKEN=$GH_TOKEN" | sudo tee -a /etc/environment
+                  
+                  # Add to .bashrc for user session
+                  echo "export GITHUB_TOKEN=$GITHUB_TOKEN" >> ~/.bashrc
+                  echo "export GH_TOKEN=$GH_TOKEN" >> ~/.bashrc
+                  
+                  # Export for current session
+                  export GITHUB_TOKEN=$GITHUB_TOKEN
+                  export GH_TOKEN=$GH_TOKEN
+                  
+                  # Also add to .profile for login shells
+                  echo "export GITHUB_TOKEN=$GITHUB_TOKEN" >> ~/.profile
+                  echo "export GH_TOKEN=$GH_TOKEN" >> ~/.profile
+                  
+                  echo "✅ GitHub token environment variables configured"
+
             - name: Session Activity Logger
               run: |
                     mkdir -p ~/Documents
@@ -406,8 +429,6 @@ jobs:
             - name: Monitor Services and Keep Alive with Self-Destruct
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-                  GH_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
-                  GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
               run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
                     SESSION_SECONDS=21000
