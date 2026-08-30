@@ -684,6 +684,7 @@ jobs:
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
                   GH_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
               run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
                     $sessionSeconds = 21000
