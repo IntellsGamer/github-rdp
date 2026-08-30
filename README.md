@@ -54,6 +54,7 @@ Go to your repository → Settings → Secrets and variables → Actions → Add
 |-------------|-------------|
 | `TAILSCALE_AUTH_KEY` | Your Tailscale auth key (get from Tailscale admin console) |
 | `RDP_PASSWORD` | Password for the Windows / Linux user (8+ characters, make it something good) |
+| `YOUR_GITHUB_TOKEN` | GitHub PAT Token for authenticating to gh and git tools (optional) |
 
 Uh, your RDP password doesn't matter at all lol because GitHub Actions **do not have internet-routable IP addresses**, yeah just put something good for it.
 
