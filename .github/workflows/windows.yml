@@ -340,6 +340,58 @@ jobs:
                     }
                     Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText $password -Force)
 
+            - name: Set GitHub Token Environment Variables
+              env:
+                  GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
+              run: |
+                    # Set system-wide environment variables
+                    [Environment]::SetEnvironmentVariable("GITHUB_TOKEN", $env:GITHUB_TOKEN, "Machine")
+                    [Environment]::SetEnvironmentVariable("GH_TOKEN", $env:GH_TOKEN, "Machine")
+                    
+                    # Set for current user
+                    [Environment]::SetEnvironmentVariable("GITHUB_TOKEN", $env:GITHUB_TOKEN, "User")
+                    [Environment]::SetEnvironmentVariable("GH_TOKEN", $env:GH_TOKEN, "User")
+                    
+                    # Set for current process
+                    $env:GITHUB_TOKEN = $env:GITHUB_TOKEN
+                    $env:GH_TOKEN = $env:GH_TOKEN
+                    
+                    # Add to user profile for future sessions
+                    $profilePath = "$env:USERPROFILE\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
+                    $profileDir = Split-Path $profilePath -Parent
+                    if (!(Test-Path $profileDir)) {
+                        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+                    }
+                    
+                    $tokenExports = @"
+                    # GitHub Tokens
+                    `$env:GITHUB_TOKEN = "$($env:GITHUB_TOKEN)"
+                    `$env:GH_TOKEN = "$($env:GH_TOKEN)"
+                    "@
+                    
+                    # Append to profile if not already present
+                    if (!(Get-Content $profilePath -ErrorAction SilentlyContinue | Select-String "GITHUB_TOKEN")) {
+                        Add-Content -Path $profilePath -Value "`r`n$tokenExports"
+                    }
+                    
+                    # Also add to system PATH environment variable (for cmd)
+                    [Environment]::SetEnvironmentVariable("GITHUB_TOKEN", $env:GITHUB_TOKEN, "Machine")
+                    [Environment]::SetEnvironmentVariable("GH_TOKEN", $env:GH_TOKEN, "Machine")
+                    
+                    # Verify tokens are set (masked in logs)
+                    if ($env:GITHUB_TOKEN) {
+                        Write-Host "✅ GITHUB_TOKEN is set (length: $($env:GITHUB_TOKEN.Length) characters)"
+                    } else {
+                        Write-Host "⚠️ GITHUB_TOKEN is empty"
+                    }
+                    
+                    if ($env:GH_TOKEN) {
+                        Write-Host "✅ GH_TOKEN is set (length: $($env:GH_TOKEN.Length) characters)"
+                    } else {
+                        Write-Host "⚠️ GH_TOKEN is empty"
+                    }
+
             - name: Configure Power and Sleep Settings
               if: inputs.configure_power
               run: |
@@ -683,8 +735,6 @@ jobs:
               shell: pwsh
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-                  GH_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
-                  GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
               run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
                     $sessionSeconds = 21000
