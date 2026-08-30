@@ -683,7 +683,8 @@ jobs:
               shell: pwsh
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
-              run: |
+              steps:
+              - run: |
                     # Fixed session duration: 5 hours 50 minutes = 21000 seconds
                     $sessionSeconds = 21000
 
@@ -752,6 +753,10 @@ jobs:
                     Write-Host "=========================================="
                     Write-Host "Session complete - System is shutting down"
                     Write-Host "=========================================="
+
+              env:
+                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
             - name: Logout Tailscale
               if: always()
