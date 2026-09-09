@@ -3,10 +3,6 @@ name: CI-RDP-Linux
 on:
     workflow_dispatch:
         inputs:
-            install_chrome:
-                description: "Install Google Chrome"
-                type: boolean
-                default: true
             install_vscode:
                 description: "Install VS Code"
                 type: boolean
@@ -31,10 +27,6 @@ on:
                 description: "Install Kilo CLI"
                 type: boolean
                 default: true
-            install_ghostery:
-                description: "Install Ghostery Extension for Chrome"
-                type: boolean
-                default: false
             configure_power:
                 description: "Configure Power and Sleep Settings"
                 type: boolean
@@ -87,18 +79,9 @@ jobs:
                     mkdir -p ~/.local/share/applications
                     echo "✅ Desktop directories created"
 
-            - name: Install Applications (Chrome, VS Code, AnyDesk, FFmpeg, VLC)
-              if: inputs.install_chrome || inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
+            - name: Install Applications (VS Code, AnyDesk, FFmpeg, VLC)
+              if: inputs.install_vscode || inputs.install_anydesk || inputs.install_ffmpeg || inputs.install_vlc
               run: |
-                    # Install Google Chrome
-                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
-                        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-                        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-                        sudo apt-get update
-                        sudo apt-get install -y google-chrome-stable
-                        echo "✅ Google Chrome installed"
-                    fi
-
                     # Install VS Code
                     if [ "${{ inputs.install_vscode }}" = "true" ]; then
                         wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
@@ -149,30 +132,6 @@ jobs:
                     fi
                     sudo npm install -g @kilocode/cli
                     echo "✅ Kilo CLI installed"
-
-            - name: Install Ghostery Extension for Chrome
-              if: inputs.install_ghostery
-              run: |
-                    if [ "${{ inputs.install_chrome }}" = "true" ]; then
-                        # Install Ghostery extension
-                        CHROME_EXTENSION_DIR="$HOME/.config/google-chrome/Default/Extensions"
-                        mkdir -p "$CHROME_EXTENSION_DIR"
-                        
-                        # Download Ghostery CRX
-                        wget -O /tmp/ghostery.crx "https://clients2.google.com/service/update2/crx?response=redirect&os=linux&arch=x64&os_arch=x86_64&nacl_arch=x86-64&prod=chromecrx&prodchannel=stable&prodversion=120.0.6099.216&lang=en-US&acceptformat=crx3&x=id%3Dmlomiejdfkolichcflejclcbmpeaniij%26uc"
-                        
-                        # Extract and install
-                        mkdir -p /tmp/ghostery_extract
-                        unzip -q /tmp/ghostery.crx -d /tmp/ghostery_extract
-                        mkdir -p "$CHROME_EXTENSION_DIR/mlomiejdfkolichcflejclcbmpeaniij"
-                        cp -r /tmp/ghostery_extract/* "$CHROME_EXTENSION_DIR/mlomiejdfkolichcflejclcbmpeaniij/"
-                        
-                        # Cleanup
-                        rm -rf /tmp/ghostery.crx /tmp/ghostery_extract
-                        echo "✅ Ghostery extension installed"
-                    else
-                        echo "ℹ️ Chrome not selected for installation, skipping Ghostery"
-                    fi
 
             - name: Configure Desktop Environment (XFCE)
               run: |
