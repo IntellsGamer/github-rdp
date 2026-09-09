@@ -68,6 +68,7 @@ jobs:
         steps:
             - name: Update System and Install Base Packages
               run: |
+                    sudo apt-get clean
                     sudo apt-get update
                     sudo apt-get upgrade -y
                     sudo apt-get install -y \
