@@ -58,17 +58,49 @@ jobs:
         timeout-minutes: 9999
 
         steps:
-            - name: Remove Google Chrome Repository
+            - name: Remove ALL Google Chrome Repositories
               run: |
-                    # Remove any existing Google Chrome repository files
+                    # Remove all possible Google Chrome repository files
                     sudo rm -f /etc/apt/sources.list.d/google-chrome.list
                     sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
-                    # Clean the cache
+                    sudo rm -f /etc/apt/sources.list.d/dl.google.com*.list
+                    sudo rm -f /etc/apt/sources.list.d/*google*.list
+                    sudo rm -f /etc/apt/sources.list.d/*chrome*.list
+                    
+                    # Also check in the main sources.list
+                    sudo sed -i '/dl.google.com/d' /etc/apt/sources.list 2>/dev/null || true
+                    sudo sed -i '/google-chrome/d' /etc/apt/sources.list 2>/dev/null || true
+                    
+                    # Remove any cached package lists
+                    sudo rm -rf /var/lib/apt/lists/dl.google.com*
+                    sudo rm -rf /var/lib/apt/lists/*google*
+                    sudo rm -rf /var/lib/apt/lists/*chrome*
+                    
+                    # Clean everything
                     sudo apt-get clean
-                    echo "✅ Google Chrome repository removed"
+                    sudo apt-get autoclean
+                    
+                    # List remaining repos for debugging
+                    echo "Remaining repositories:"
+                    ls -la /etc/apt/sources.list.d/ || echo "No sources.list.d files"
+                    
+                    echo "✅ All Google Chrome repositories removed"
 
             - name: Update System and Install Base Packages
               run: |
+                    # Backup and create clean sources list
+                    sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
+                    
+                    # Remove Google Chrome repos from sources.list
+                    sudo sed -i '/dl.google.com/d' /etc/apt/sources.list
+                    sudo sed -i '/google-chrome/d' /etc/apt/sources.list
+                    
+                    # Remove all files in sources.list.d that reference Google
+                    sudo find /etc/apt/sources.list.d/ -type f -name "*google*" -exec rm -f {} \;
+                    sudo find /etc/apt/sources.list.d/ -type f -name "*chrome*" -exec rm -f {} \;
+                    
+                    # Clean cache
+                    sudo rm -rf /var/lib/apt/lists/*
                     sudo apt-get clean
                     sudo apt-get update
                     sudo apt-get upgrade -y
