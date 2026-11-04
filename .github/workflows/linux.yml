@@ -288,18 +288,31 @@ jobs:
 
             - name: Setup SSH Server
               run: |
-                    sudo systemctl enable ssh
-                    sudo systemctl start ssh
-                    
-                    # Configure SSH for password authentication
-                    sudo sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-                    sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
-                    
-                    # Restart SSH service
-                    sudo systemctl restart ssh
-                    
-                    echo "✅ SSH server configured"
-
+                # 1. Remove any explicit "PasswordAuthentication no" from main config and drop-ins
+                sudo sed -i '/^\s*PasswordAuthentication\s\+no/d' /etc/ssh/sshd_config
+                sudo find /etc/ssh/sshd_config.d/ -type f -name '*.conf' -exec \
+                  sudo sed -i '/^\s*PasswordAuthentication\s\+no/d' {} +
+            
+                # 2. Ensure "PasswordAuthentication yes" is present (add if missing)
+                if ! grep -qE '^\s*PasswordAuthentication\s\+yes' /etc/ssh/sshd_config; then
+                  echo 'PasswordAuthentication yes' | sudo tee -a /etc/ssh/sshd_config
+                fi
+            
+                # 3. Ensure PAM is used (required for password auth on many systems)
+                sudo sed -i 's/^#\?UsePAM .*/UsePAM yes/' /etc/ssh/sshd_config
+            
+                # 4. Optionally allow keyboard-interactive (covers some PAM cases)
+                sudo sed -i 's/^#\?KbdInteractiveAuthentication .*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
+            
+                # 5. Verify the effective configuration
+                echo "Effective password authentication setting:"
+                sudo sshd -T | grep -i '^passwordauthentication' || true
+                # Expected output: passwordauthentication yes
+            
+                # 6. Restart SSH (full restart, not just reload)
+                sudo systemctl restart ssh
+            
+                echo "✅ SSH server configured for password authentication"
             - name: Setup XRDP
               run: |
                     # Configure XRDP to use XFCE
@@ -330,9 +343,10 @@ jobs:
                         echo "❌ TAILSCALE_AUTH_KEY environment variable is not set"
                         exit 1
                     fi
-                    sudo tailscale up --auth-key $TAILSCALE_AUTH_KEY
-                    echo "✅ Tailscale started"
-
+                    # --ssh enables Tailscale SSH on this node
+                    sudo tailscale up --ssh --auth-key "$TAILSCALE_AUTH_KEY"
+                    echo "✅ Tailscale started with Tailscale SSH enabled"
+                    tailscale status
             - name: Set User Password
               env:
                   RDP_PASSWORD: ${{ secrets.RDP_PASSWORD }}
