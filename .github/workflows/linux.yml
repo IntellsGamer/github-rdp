@@ -6,11 +6,11 @@ on:
             install_vscode:
                 description: "Install VS Code"
                 type: boolean
-                default: true
+                default: false
             install_anydesk:
                 description: "Install AnyDesk"
                 type: boolean
-                default: true
+                default: false
             install_ffmpeg:
                 description: "Install FFmpeg"
                 type: boolean
@@ -111,7 +111,7 @@ jobs:
                         xorg xfce4 xfce4-goodies \
                         xrdp tightvncserver \
                         dbus-x11 \
-                        htop neofetch \
+                        htop \
                         unzip
 
             - name: Create Desktop Directory
